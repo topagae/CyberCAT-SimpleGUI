@@ -12,357 +12,355 @@ using CP2077SaveEditor.Utils;
 using CP2077SaveEditor.Views.Controls;
 using WolvenKit.Common.Services;
 using WolvenKit.Core.Compression;
+using WolvenKit.RED4.Save;
 using WolvenKit.RED4.Save.IO;
-using WolvenKit.RED4.TweakDB.Helper;
-using WolvenKit.RED4.Types.Pools;
 
-namespace CP2077SaveEditor.Views
+namespace CP2077SaveEditor.Views;
+
+public partial class Form2 : Form, INotifyPropertyChanged
 {
-    public partial class Form2 : Form, INotifyPropertyChanged
+    private static readonly string s_saveGamesDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Saved Games", "CD Projekt Red", "Cyberpunk 2077");
+
+    internal bool IsLoaded;
+
+    private SaveFileHelper _activeSaveFile;
+
+    private bool _isSaving;
+
+    public Form2()
     {
-        internal static TweakDBStringHelper TweakDbStringHelper;
-        internal HashService HashService;
+        InitializeComponent();
 
-        internal bool IsLoaded;
+        Text = $"Cyberpunk 2077 Save Editor v{Application.ProductVersion} for Patch 2.5 (unofficial fork of CyberCAT-SimpleGUI)";
+        tssl_Info.Text = $"v{Application.ProductVersion} (Patch 2.5) - fork of CyberCAT-SimpleGUI by Deweh - click for credits";
 
-        private SaveFileHelper _activeSaveFile;
+        CompressionSettings.Get().UseOodle = false;
 
-        private bool _isSaving = false;
+        RegisterControl(new PlayerStatsControl(this), true);
+        RegisterControl(new AppearanceControl(this));
+        RegisterControl(new InventoryControl(this));
+        RegisterControl(new VehiclesControl(this));
+        RegisterControl(new QuestFactsControl(this));
+        RegisterControl(new ExtrasControl(this));
 
-        public Form2()
+        LoadConfig();
+    }
+
+    private static void LoadConfig()
+    {
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        if (!File.Exists(configPath))
         {
-            InitializeComponent();
+            return;
+        }
 
-            CompressionSettings.Get().UseOodle = false;
-            ModManager.LoadTypes();
-
-            RegisterControl(new PlayerStatsControl(this), true);
-            RegisterControl(new AppearanceControl(this));
-            RegisterControl(new InventoryControl(this));
-            RegisterControl(new VehiclesControl(this));
-            RegisterControl(new QuestFactsControl(this));
-            RegisterControl(new ExtrasControl(this));
-
-            if (File.Exists(Environment.CurrentDirectory + "\\config.json"))
+        try
+        {
+            var config = JsonSerializer.Deserialize<Dictionary<string, int>>(File.ReadAllText(configPath));
+            if (config.TryGetValue("EnableWIPFeatures", out var enableWipFeatures) && enableWipFeatures == 1)
             {
-                try
-                {
-                    var config = JsonSerializer.Deserialize<Dictionary<string, int>>(File.ReadAllText(Environment.CurrentDirectory + "\\config.json"));
-                    if (config.ContainsKey("EnablePSData") && config["EnablePSData"] == 0)
+                Global.IsDebug = true;
+            }
+        }
+        catch (Exception)
+        {
+            MessageBox.Show("Unable to read config.json", "Notice");
+        }
+    }
+
+    private async void Form2_Load(object sender, EventArgs e)
+    {
+        SetStatus("Init...");
+
+        // Both are slow one-time initializations that don't depend on each other. HashService fills static name pools.
+        await Task.WhenAll(
+            Task.Run(() => new HashService()),
+            Task.Run(ModManager.LoadTypes));
+
+        openSaveButton.Enabled = true;
+
+        SetStatus("Idle");
+    }
+
+    internal SaveFileHelper ActiveSaveFile
+    {
+        get => _activeSaveFile;
+        private set => SetField(ref _activeSaveFile, value);
+    }
+
+    #region Controls
+
+    private void RegisterControl(UserControl userControl, bool isLandingPage = false)
+    {
+        if (userControl is not IGameControl gc)
+        {
+            throw new ArgumentException($"{userControl.GetType().Name} doesn't implement {nameof(IGameControl)}", nameof(userControl));
+        }
+
+        userControl.Dock = DockStyle.Fill;
+
+        sm_Menu.AddButton(gc.GameControlName, (_, _) => { SwitchPanel(userControl); });
+        if (isLandingPage)
+        {
+            SwitchPanel(userControl);
+        }
+    }
+
+    private void SwitchPanel(UserControl userControl)
+    {
+        if (userControl == null)
+        {
+            return;
+        }
+
+        this.InvokeIfRequired(() =>
+        {
+            pnl_Content.Controls.Clear();
+            pnl_Content.Controls.Add(userControl);
+        });
+    }
+
+    #endregion Controls
+
+    private void openSaveButton_Click(object sender, EventArgs e)
+    {
+        using var fileWindow = new OpenFileDialog
+        {
+            InitialDirectory = s_saveGamesDirectory,
+            Filter = "Cyberpunk 2077 Save File|*.dat"
+        };
+
+        if (fileWindow.ShowDialog() == DialogResult.OK)
+        {
+            LoadSave(fileWindow.FileName);
+        }
+    }
+
+    private static (EFileReadErrorCodes Status, CyberpunkSaveFile Save, uint GameVersion) ReadSave(string savePath)
+    {
+        // Read-only, so saves can also be opened while the game is running
+        using var fs = File.OpenRead(savePath);
+        using var reader = new CyberpunkSaveReader(fs);
+
+        var status = reader.ReadFile(out var save);
+        if (status != EFileReadErrorCodes.UnsupportedVersion)
+        {
+            return (status, save, 0);
+        }
+
+        fs.Position = 0;
+        reader.ReadFileInfo(out var info);
+        return (status, null, info?.GameVersion ?? 0);
+    }
+
+    private static byte[] ReadAllBytesIfExists(string path) => File.Exists(path) ? File.ReadAllBytes(path) : null;
+
+    private async void LoadSave(string savePath)
+    {
+        IsLoaded = false;
+        pnl_Content.Enabled = false;
+        openSaveButton.Enabled = false;
+        saveChangesButton.Enabled = false;
+
+        SetStatus("Loading save...");
+
+        try
+        {
+            var (status, save, gameVersion) = await Task.Run(() => ReadSave(savePath));
+            switch (status)
+            {
+                case EFileReadErrorCodes.NoError:
+                    var saveDirectory = Path.GetDirectoryName(savePath);
+                    ActiveSaveFile = new SaveFileHelper
                     {
-                        // Global.PSDataEnabled = false;
-                    }
+                        SaveFile = save,
+                        Metadata = ReadAllBytesIfExists(Path.Combine(saveDirectory, "metadata.9.json")),
+                        ImageData = ReadAllBytesIfExists(Path.Combine(saveDirectory, "screenshot.png"))
+                    };
 
-                    if (config.ContainsKey("EnableWIPFeatures") && config["EnableWIPFeatures"] == 1)
-                    {
-                        Global.IsDebug = true;
-                    }
-                }
-                catch (Exception)
-                {
-                    MessageBox.Show("Unable to read config.json", "Notice");
-                }
+                    filePathLabel.Text = Path.GetFileName(saveDirectory);
+                    saveChangesButton.Enabled = true;
+                    pnl_Content.Enabled = true;
+                    IsLoaded = true;
+
+                    // Release the previously loaded save right away, they are large
+                    GC.Collect();
+                    break;
+                case EFileReadErrorCodes.NoCSav:
+                    MessageBox.Show("Failed to parse save file: File contains invalid data");
+                    break;
+                case EFileReadErrorCodes.UnsupportedVersion:
+                    MessageBox.Show($"Failed to parse save file: Game version {gameVersion} is not supported!");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(status), status, null);
             }
         }
-
-        private async void Form2_Load(object sender, EventArgs e)
+        catch (Exception e)
         {
-            SetStatus("Init...");
-
-            await Init();
-
-            openSaveButton.Enabled = true;
-
-            SetStatus("Idle");
+            ShowError("Failed to parse save file", e);
         }
 
-        internal SaveFileHelper ActiveSaveFile
+        SetStatus("Idle");
+        openSaveButton.Enabled = true;
+    }
+
+    private static void ShowError(string message, Exception e)
+    {
+        try
         {
-            get => _activeSaveFile;
-            private set => SetField(ref _activeSaveFile, value);
+            File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "error.txt"), e.ToString());
+            MessageBox.Show($"{message}:{Environment.NewLine}{e.Message}{Environment.NewLine}An error.txt file has been generated with additional information.");
+        }
+        catch (Exception)
+        {
+            MessageBox.Show($"{message}:{Environment.NewLine}{e}");
+        }
+    }
+
+    internal void SetStatus(string message)
+    {
+        this.InvokeIfRequired(() => { tssl_Status.Text = message; });
+    }
+
+    public event PropertyChangedEventHandler PropertyChanged;
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    protected bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        field = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+
+    private async void saveChangesButton_Click(object sender, EventArgs e)
+    {
+        using var saveWindow = new FolderBrowserDialog { InitialDirectory = s_saveGamesDirectory };
+        if (saveWindow.ShowDialog() != DialogResult.OK)
+        {
+            return;
         }
 
-        #region Controls
+        var fileDirectory = saveWindow.SelectedPath;
 
-        private void RegisterControl(UserControl userControl, bool isLandingPage = false)
+        if (string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(fileDirectory)), s_saveGamesDirectory, StringComparison.OrdinalIgnoreCase))
         {
-            if (userControl is not IGameControl gc)
-            {
-                throw new Exception();
-            }
-
-            userControl.Dock = DockStyle.Fill;
-
-            sm_Menu.AddButton(gc.GameControlName, (_, _) => { SwitchPanel(userControl); });
-            if (isLandingPage)
-            {
-                SwitchPanel(userControl);
-            }
+            MessageBox.Show("Saving into the root folder isn't allowed");
+            return;
         }
 
-        private void SwitchPanel(UserControl userControl)
+        pnl_Content.Enabled = false;
+        openSaveButton.Enabled = false;
+        saveChangesButton.Enabled = false;
+
+        SetStatus("Saving...");
+        _isSaving = true;
+
+        var saved = false;
+        try
         {
-            if (userControl == null)
-            {
-                return;
-            }
-
-            this.InvokeIfRequired(() =>
-            {
-                if (pnl_Content.Controls.Count != 0)
-                {
-                    pnl_Content.Controls.Clear();
-                }
-
-                pnl_Content.Controls.Add(userControl);
-            });
-        }
-
-        #endregion Controls
-
-        private void openSaveButton_Click(object sender, EventArgs e)
-        {
-            var fileWindow = new OpenFileDialog();
-            fileWindow.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Saved Games\\CD Projekt Red\\Cyberpunk 2077\\";
-            fileWindow.Filter = "Cyberpunk 2077 Save File|*.dat";
-            if (fileWindow.ShowDialog() == DialogResult.OK)
-            {
-                LoadSave(fileWindow.FileName);
-            }
-        }
-
-        private async Task Init()
-        {
-            if (TweakDbStringHelper == null)
-            {
-                var tweakDbStrStream = typeof(TweakDBService).Assembly.GetManifestResourceStream("WolvenKit.Common.Resources.tweakdbstr.kark");
-
-                TweakDbStringHelper = new TweakDBStringHelper();
-                TweakDbStringHelper.LoadFromStream(tweakDbStrStream);
-            }
-
-            if (HashService == null)
-            {
-                await Task.Run(() => HashService = new HashService());
-            }
-        }
-
-        private async void LoadSave(string savePath)
-        {
-            IsLoaded = false;
-            pnl_Content.Enabled = false;
-            openSaveButton.Enabled = false;
-            saveChangesButton.Enabled = false;
-
-            SetStatus("Loading save...");
-
-            var status = EFileReadErrorCodes.NoCSav;
-
-            try
-            {
-                await Task.Run(() =>
-                {
-                    using var fs = File.Open(savePath, FileMode.Open);
-                    using var reader = new CyberpunkSaveReader(fs);
-
-                    status = reader.ReadFile(out var save);
-                    switch (status)
-                    {
-                        case EFileReadErrorCodes.NoError:
-                            ActiveSaveFile = new SaveFileHelper { SaveFile = save };
-
-                            var metadataPath = Path.Combine(Path.GetDirectoryName(savePath), "metadata.9.json");
-                            if (File.Exists(metadataPath))
-                            {
-                                ActiveSaveFile.Metadata = File.ReadAllBytes(metadataPath);
-                            }
-
-                            var screenshotPath = Path.Combine(Path.GetDirectoryName(savePath), "screenshot.png");
-                            if (File.Exists(screenshotPath))
-                            {
-                                ActiveSaveFile.ImageData = File.ReadAllBytes(screenshotPath);
-                            }
-
-                            this.InvokeIfRequired(() => { saveChangesButton.Enabled = true; });
-                            break;
-                        case EFileReadErrorCodes.NoCSav:
-                            MessageBox.Show("Failed to parse save file: File contains invalid data");
-                            return;
-                        case EFileReadErrorCodes.UnsupportedVersion:
-                            fs.Position = 0;
-                            reader.ReadFileInfo(out var info);
-
-                            MessageBox.Show(
-                                $"Failed to parse save file: Game version {info.Value.GameVersion} is not supported!");
-                            return;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-                });
-
-                filePathLabel.Text = Path.GetFileName(Path.GetDirectoryName(savePath));
-
-                GC.Collect();
-            }
-            catch (Exception e)
-            {
-                try
-                {
-                    var message = e.Message;
-                    if (message == "CEnum \"gamedataStatType.ItemTierQuality\" could not be found!")
-                    {
-                        message += Environment.NewLine + "Loading of modded saves with this data is currently not supported! See \"Known Issues\" on Nexus mods";
-                    }
-
-                    await File.WriteAllTextAsync("error.txt", message + Environment.NewLine + e.StackTrace);
-                    MessageBox.Show("Failed to parse save file:" + Environment.NewLine + 
-                                    message + Environment.NewLine +
-                                    " An error.txt file has been generated with additional information.");
-                }
-                catch (Exception)
-                {
-                    MessageBox.Show("Failed to parse save file: " + Environment.NewLine + 
-                                    e.Message + Environment.NewLine + Environment.NewLine +
-                                    "Stack Trace:" + Environment.NewLine + 
-                                    e.StackTrace);
-                }
-            }
-
-            SetStatus("Idle");
-
-            openSaveButton.Enabled = true;
-
-            if (status == EFileReadErrorCodes.NoError)
-            {
-                pnl_Content.Enabled = true;
-                IsLoaded = true;
-            }
-        }
-
-        internal void SetStatus(string message)
-        {
-            this.InvokeIfRequired(() => { tssl_Status.Text = message; });
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        protected bool SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-            field = value;
-            OnPropertyChanged(propertyName);
-            return true;
-        }
-
-        private async void saveChangesButton_Click(object sender, EventArgs e)
-        {
-            var initialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\Saved Games\\CD Projekt Red\\Cyberpunk 2077";
-
-            var saveWindow = new FolderBrowserDialog();
-            saveWindow.InitialDirectory = initialDirectory;
-            if (saveWindow.ShowDialog() != DialogResult.OK)
-            {
-                return;
-            }
-
-            var fileDirectory = saveWindow.SelectedPath;
-
-            if (fileDirectory == initialDirectory)
-            {
-                MessageBox.Show("Saving into the root folder isn't allowed");
-                return;
-            }
-
-            pnl_Content.Enabled = false;
-            openSaveButton.Enabled = false;
-            saveChangesButton.Enabled = false;
-
             var fileName = Path.Combine(fileDirectory, "sav.dat");
-
-            if (File.Exists(fileName) && !File.Exists(Path.Combine(fileDirectory, "sav.old")))
+            var backupName = Path.Combine(fileDirectory, "sav.old");
+            if (File.Exists(fileName) && !File.Exists(backupName))
             {
-                File.Copy(fileName, Path.Combine(fileDirectory, "sav.old"));
+                File.Copy(fileName, backupName);
             }
 
-            SetStatus("Saving...");
-            _isSaving = true;
-
-            try
+            var warnings = ActiveSaveFile.PrepareForSave();
+            if (warnings.Count > 0)
             {
-                using var ms = new MemoryStream();
-
-                await Task.Run(() =>
-                {
-                    using var writer = new CyberpunkSaveWriter(ms, Encoding.UTF8, true);
-                    writer.WriteFile(ActiveSaveFile.SaveFile, true);
-                });
-
-                await using (var fs = File.Open(fileName, FileMode.Create))
-                {
-                    ms.Position = 0;
-                    await ms.CopyToAsync(fs);
-                }
-
-                var metadataPath = Path.Combine(fileDirectory, "metadata.9.json");
-                if (!File.Exists(metadataPath))
-                {
-                    if (ActiveSaveFile.Metadata != null)
-                    {
-                        await File.WriteAllBytesAsync(metadataPath, ActiveSaveFile.Metadata);
-                    }
-                    else
-                    {
-                        MessageBox.Show("Error while saving file: metadata.9.json could not be found.");
-                    }
-                }
-
-                var screenshotPath = Path.Combine(fileDirectory, "screenshot.png");
-                if (!File.Exists(screenshotPath))
-                {
-                    if (ActiveSaveFile.ImageData != null)
-                    {
-                        await File.WriteAllBytesAsync(screenshotPath, ActiveSaveFile.ImageData);
-                    }
-                    else
-                    {
-                        MessageBox.Show("Error while saving file: screenshot.png could not be found.");
-                    }
-                }
-            }
-            catch (Exception err)
-            {
-                try
-                {
-                    await File.WriteAllTextAsync("error.txt", err.Message + '\n' + err.TargetSite + '\n' + err.StackTrace);
-                    MessageBox.Show("Failed to save changes: " + err.Message + " An error.txt file has been generated with additional information.");
-                }
-                catch (Exception)
-                {
-                    MessageBox.Show("Failed to save changes: " + err.Message + err.StackTrace);
-                }
+                MessageBox.Show(string.Join(Environment.NewLine, warnings), "Warning");
             }
 
-            pnl_Content.Enabled = true;
-            openSaveButton.Enabled = true;
-            saveChangesButton.Enabled = true;
+            await Task.Run(() => WriteSave(ActiveSaveFile.SaveFile, fileName));
 
+            await WriteIfMissing(Path.Combine(fileDirectory, "metadata.9.json"), ActiveSaveFile.Metadata);
+            await WriteIfMissing(Path.Combine(fileDirectory, "screenshot.png"), ActiveSaveFile.ImageData);
+
+            saved = true;
+        }
+        catch (Exception err)
+        {
+            ShowError("Failed to save changes", err);
+        }
+        finally
+        {
             _isSaving = false;
-            SetStatus("File saved.");
-
-            GC.Collect();
         }
 
-        private void Form2_FormClosing(object sender, FormClosingEventArgs e)
+        pnl_Content.Enabled = true;
+        openSaveButton.Enabled = true;
+        saveChangesButton.Enabled = true;
+
+        SetStatus(saved ? "File saved." : "Saving failed.");
+    }
+
+    private static void WriteSave(CyberpunkSaveFile save, string fileName)
+    {
+        // Write to a temporary file first, so a failed or interrupted save never leaves a broken sav.dat behind
+        var tempName = fileName + ".tmp";
+        try
         {
-            if (_isSaving && MessageBox.Show("Saving in progress. Closing now will lead to corrupted saves.\r\nAre you sure you want to exit?", "Warning", MessageBoxButtons.YesNo) != DialogResult.Yes)
+            using (var fs = File.Create(tempName))
+            using (var writer = new CyberpunkSaveWriter(fs, Encoding.UTF8, true))
             {
-                e.Cancel = true;
+                writer.WriteFile(save, true);
             }
+
+            File.Move(tempName, fileName, true);
+        }
+        finally
+        {
+            File.Delete(tempName);
+        }
+    }
+
+    private static async Task WriteIfMissing(string path, byte[] data)
+    {
+        if (File.Exists(path))
+        {
+            return;
+        }
+
+        if (data == null)
+        {
+            MessageBox.Show($"Error while saving file: {Path.GetFileName(path)} could not be found.");
+            return;
+        }
+
+        await File.WriteAllBytesAsync(path, data);
+    }
+
+    private void tssl_Info_Click(object sender, EventArgs e)
+    {
+        MessageBox.Show(
+            $"""
+            CyberCAT-SimpleGUI v{Application.ProductVersion} - Patch 2.5 update
+
+            Original editor: CyberCAT-SimpleGUI by Deweh (DeweySalt) and contributors
+            https://github.com/Deweh/CyberCAT-SimpleGUI
+
+            Based on CyberCAT by SirBitesalot and contributors
+            Save parsing by WolvenKit (GPL-3.0) by the WolvenKit team
+
+            Patch 2.5 update: written by Claude (Anthropic's AI model), directed and tested by topagae.
+            This fork is unofficial and not endorsed by the original authors.
+
+            Always back up your saves. See README.md and NOTICE.md for details.
+            """,
+            "Credits");
+    }
+
+    private void Form2_FormClosing(object sender, FormClosingEventArgs e)
+    {
+        if (_isSaving && MessageBox.Show("Saving in progress. Closing now will cancel it and your changes won't be saved.\r\nAre you sure you want to exit?", "Warning", MessageBoxButtons.YesNo) != DialogResult.Yes)
+        {
+            e.Cancel = true;
         }
     }
 }

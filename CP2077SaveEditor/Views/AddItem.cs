@@ -6,96 +6,121 @@ using CP2077SaveEditor.Utils;
 using WolvenKit.RED4.Save.Classes;
 using WolvenKit.RED4.Types;
 
-namespace CP2077SaveEditor.Views
+namespace CP2077SaveEditor.Views;
+
+public partial class AddItem : Form
 {
-    public partial class AddItem : Form
+    private SubInventory _inventory;
+    private SaveFileHelper _activeSaveFile;
+
+    private Dictionary<string, ItemRecord> _items = new();
+
+    private TweakDBID? _selectedItemId;
+    private ItemRecord _selectedItemRecord;
+
+    public AddItem()
     {
-        private SubInventory _inventory;
-        private SaveFileHelper _activeSaveFile;
+        InitializeComponent();
+    }
 
-        private Dictionary<string, ItemRecord> _items = new();
+    public void LoadDialog(SubInventory inventory, SaveFileHelper activeSaveFile)
+    {
+        _inventory = inventory;
+        _activeSaveFile = activeSaveFile;
 
-        private TweakDBID? _selectedItemId;
-        private ItemRecord _selectedItemRecord;
+        RefreshItems();
+        ShowDialog();
+    }
 
-        public AddItem()
+    private void RefreshItems()
+    {
+        _items = new Dictionary<string, ItemRecord>();
+
+        foreach (var (key, value) in ResourceHelper.ItemClasses)
         {
-            InitializeComponent();
+            _items.Add(((TweakDBID)key).GetResolvedText()!, value);
         }
 
-        public void LoadDialog(SubInventory inventory, SaveFileHelper activeSaveFile)
-        {
-            _inventory = inventory;
-            _activeSaveFile = activeSaveFile;
+        _items = _items.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
 
-            RefreshItems();
-            ShowDialog();
+        cb_Items.Items.Clear();
+        cb_Items.Items.AddRange(_items.Keys.Cast<object>().ToArray());
+    }
+
+    private void cb_Items_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        _selectedItemId = null;
+        _selectedItemRecord = null;
+
+        num_Quantity.Enabled = false;
+        btn_Add.Enabled = false;
+
+        if (cb_Items.SelectedItem is not string itemStr || !_items.TryGetValue(itemStr, out var itemRecord))
+        {
+            return;
         }
 
-        private void RefreshItems()
+        _selectedItemId = itemStr;
+        _selectedItemRecord = itemRecord;
+
+        if (itemRecord.IsSingleInstance || itemRecord.Type == "Grenade")
         {
-            _items = new Dictionary<string, ItemRecord>();
-
-            foreach (var (key, value) in ResourceHelper.ItemClasses)
-            {
-                _items.Add(((TweakDBID)key).GetResolvedText()!, value);
-            }
-
-            _items = _items.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
-
-            cb_Items.Items.Clear();
-            cb_Items.Items.AddRange(_items.Keys.Cast<object>().ToArray());
+            num_Quantity.Enabled = true;
         }
 
-        private void cb_Items_SelectedIndexChanged(object sender, EventArgs e)
+        btn_Add.Enabled = true;
+    }
+
+    private void btn_Add_Click(object sender, EventArgs e)
+    {
+        if (_selectedItemId == null)
         {
-            _selectedItemId = null;
-            _selectedItemRecord = null;
-
-            num_Quantity.Enabled = false;
-            btn_Add.Enabled = false;
-
-            if (cb_Items.SelectedItem is not string itemStr || !_items.TryGetValue(itemStr, out var itemRecord))
-            {
-                return;
-            }
-
-            _selectedItemId = itemStr;
-            _selectedItemRecord = itemRecord;
-
-            if (itemRecord.IsSingleInstance || itemRecord.Type == "Grenade")
-            {
-                num_Quantity.Enabled = true;
-            }
-
-            btn_Add.Enabled = true;
+            return;
         }
 
-        private void btn_Add_Click(object sender, EventArgs e)
+        var item = new ItemData
         {
-            if (_selectedItemId == null)
+            ItemInfo = new ItemInfo
             {
-                return;
+                ItemId = new gameItemID
+                {
+                    Id = (TweakDBID)_selectedItemId,
+                    UniqueCounter = _activeSaveFile.GetNextUniqueCounter()
+                }
             }
+        };
 
-            var item = new ItemData
+        if (_selectedItemRecord.Type == "Grenade")
+        {
+            item.ItemInfo.ItemStructure = ItemStructure.Quantity | ItemStructure.Extended;
+            item.ItemInfo.ItemId.RngSeed = 2;
+
+            item.Quantity = (uint)num_Quantity.Value;
+            item.ItemAdditionalInfo = new ItemAdditionalInfo();
+            item.ItemSlotPart = new ItemSlotPart
             {
                 ItemInfo = new ItemInfo
                 {
-                    ItemId = new gameItemID
-                    {
-                        Id = (TweakDBID)_selectedItemId,
-                        UniqueCounter = _activeSaveFile.GetNextUniqueCounter()
-                    }
-                }
+                    ItemId = new gameItemID()
+                },
+                AppearanceName = "None",
+                ItemAdditionalInfo = new ItemAdditionalInfo()
             };
-
-            if (_selectedItemRecord.Type == "Grenade")
+        }
+        else
+        {
+            if (_selectedItemRecord.IsSingleInstance)
             {
-                item.ItemInfo.ItemStructure = ItemStructure.Quantity | ItemStructure.Extended;
+                item.ItemInfo.ItemStructure = ItemStructure.None; // or 2 with any seed
                 item.ItemInfo.ItemId.RngSeed = 2;
 
                 item.Quantity = (uint)num_Quantity.Value;
+            }
+            else
+            {
+                item.ItemInfo.ItemStructure = ItemStructure.None; // or 1 with any seed
+                item.ItemInfo.ItemId.RngSeed = _activeSaveFile.CreateUniqueSeed();
+
                 item.ItemAdditionalInfo = new ItemAdditionalInfo();
                 item.ItemSlotPart = new ItemSlotPart
                 {
@@ -107,87 +132,61 @@ namespace CP2077SaveEditor.Views
                     ItemAdditionalInfo = new ItemAdditionalInfo()
                 };
             }
-            else
+        }
+
+        if (item.HasExtendedData())
+        {
+            if (ResourceHelper.ItemClasses.TryGetValue(item.ItemInfo.ItemId.Id, out var itemRecord))
             {
-                if (_selectedItemRecord.IsSingleInstance)
+                if (itemRecord.Type == "Clothing" || itemRecord.Type == "Weapon" || itemRecord.Type == "WeaponItem")
                 {
-                    item.ItemInfo.ItemStructure = ItemStructure.None; // or 2 with any seed
-                    item.ItemInfo.ItemId.RngSeed = 2;
-
-                    item.Quantity = (uint)num_Quantity.Value;
+                    _activeSaveFile.CreateStatData(item.ItemInfo.ItemId);
                 }
-                else
+
+                if (itemRecord.SlotParts is { Count: > 0 })
                 {
-                    item.ItemInfo.ItemStructure = ItemStructure.None; // or 1 with any seed
-                    item.ItemInfo.ItemId.RngSeed = _activeSaveFile.CreateUniqueSeed();
+                    item.ItemSlotPart = CreateSlotPart(itemRecord.SlotParts[0].ItemPartPreset, itemRecord.SlotParts[0].Slot);
 
-                    item.ItemAdditionalInfo = new ItemAdditionalInfo();
-                    item.ItemSlotPart = new ItemSlotPart
+                    if (itemRecord.SlotParts.Count > 1)
                     {
-                        ItemInfo = new ItemInfo
+                        var childMods = new List<ItemSlotPart>();
+                        for (int i = 1; i < itemRecord.SlotParts.Count; i++)
                         {
-                            ItemId = new gameItemID()
-                        },
-                        AppearanceName = "None",
-                        ItemAdditionalInfo = new ItemAdditionalInfo()
-                    };
-                }
-            }
+                            var subMod = CreateSlotPart(itemRecord.SlotParts[i].ItemPartPreset, itemRecord.SlotParts[i].Slot);
 
-            if (item.HasExtendedData())
-            {
-                if (ResourceHelper.ItemClasses.TryGetValue(item.ItemInfo.ItemId.Id, out var itemRecord))
-                {
-                    if (itemRecord.Type == "Clothing" || itemRecord.Type == "Weapon" || itemRecord.Type == "WeaponItem")
-                    {
-                        _activeSaveFile.CreateStatData(item.ItemInfo.ItemId);
-                    }
-
-                    if (itemRecord.SlotParts is { Count: > 0 })
-                    {
-                        item.ItemSlotPart = CreateSlotPart(itemRecord.SlotParts[0].ItemPartPreset, itemRecord.SlotParts[0].Slot);
-
-                        if (itemRecord.SlotParts.Count > 1)
-                        {
-                            var childMods = new List<ItemSlotPart>();
-                            for (int i = 1; i < itemRecord.SlotParts.Count; i++)
-                            {
-                                var subMod = CreateSlotPart(itemRecord.SlotParts[i].ItemPartPreset, itemRecord.SlotParts[i].Slot);
-
-                                childMods.Add(subMod);
-                            }
-
-                            item.ItemSlotPart!.Children = childMods;
+                            childMods.Add(subMod);
                         }
+
+                        item.ItemSlotPart!.Children = childMods;
                     }
                 }
             }
+        }
 
-            _inventory.Items.Add(item);
+        _inventory.Items.Add(item);
 
-            Close();
+        Close();
 
-            ItemSlotPart CreateSlotPart(TweakDBID id, TweakDBID slot)
+        ItemSlotPart CreateSlotPart(TweakDBID id, TweakDBID slot)
+        {
+            return new ItemSlotPart
             {
-                return new ItemSlotPart
+                ItemInfo = new ItemInfo
                 {
-                    ItemInfo = new ItemInfo
+                    ItemId = new gameItemID
                     {
-                        ItemId = new gameItemID
-                        {
-                            Id = id,
-                            RngSeed = _activeSaveFile.CreateUniqueSeed(),
-                            UniqueCounter = _activeSaveFile.GetNextUniqueCounter()
-                        }
-                    },
-                    AppearanceName = "None",
-                    AttachmentSlotTdbId = slot,
-                    ItemAdditionalInfo = new ItemAdditionalInfo
-                    {
-                        RequiredLevel = float.MaxValue
+                        Id = id,
+                        RngSeed = _activeSaveFile.CreateUniqueSeed(),
+                        UniqueCounter = _activeSaveFile.GetNextUniqueCounter()
                     }
-                };
-            }
+                },
+                AppearanceName = "None",
+                AttachmentSlotTdbId = slot,
+                ItemAdditionalInfo = new ItemAdditionalInfo
+                {
+                    RequiredLevel = float.MaxValue
+                }
+            };
         }
     }
 }

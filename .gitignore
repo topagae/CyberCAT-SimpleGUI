@@ -338,3 +338,13 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+# Local test saves and editor output
+current-errors/
+sav.dat
+sav.old
+metadata.*.json
+screenshot.png
+error.txt
+
+# Release publish profile (no credentials in it)
+!CP2077SaveEditor/Properties/PublishProfiles/win-x64.pubxml

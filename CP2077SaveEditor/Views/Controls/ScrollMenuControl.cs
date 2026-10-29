@@ -3,82 +3,81 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
-namespace CP2077SaveEditor.Views.Controls
+namespace CP2077SaveEditor.Views.Controls;
+
+public partial class ScrollMenuControl : UserControl
 {
-    public partial class ScrollMenuControl : UserControl
+    private readonly List<ModernButton> _buttons = new();
+
+    public ScrollMenuControl()
     {
-        private readonly List<ModernButton> _buttons = new();
+        InitializeComponent();
+    }
 
-        public ScrollMenuControl()
+    public void AddButton(string text, EventHandler eventHandler)
+    {
+        var button = new ModernButton()
         {
-            InitializeComponent();
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            ClickEffectEnabled = true,
+            DefaultColor = Color.White,
+            HoverColor = Color.DarkGray,
+            Location = new Point(-1, _buttons.Count * 60 - 1),
+            Size = new Size(pnl_Menu.Width + 1, 61),
+            Text = text,
+            TextColor = Color.Black,
+            TextFont = new Font("Segoe UI", 11.25F, FontStyle.Regular, GraphicsUnit.Point),
+        };
+        button.Click += eventHandler;
+
+        _buttons.Add(button);
+        pnl_Menu.Controls.Add(button);
+    }
+
+    private void ScrollBy(int offset)
+    {
+        if (pnl_Menu.Controls[0].Location.Y + offset == 59)
+        {
+            return;
         }
 
-        public void AddButton(string text, EventHandler eventHandler)
+        if (pnl_Menu.Controls[^1].Location.Y + offset == -61)
         {
-            var button = new ModernButton()
-            {
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle,
-                ClickEffectEnabled = true,
-                DefaultColor = Color.White,
-                HoverColor = Color.DarkGray,
-                Location = new Point(-1, _buttons.Count * 60 - 1),
-                Size = new Size(pnl_Menu.Width + 1, 61),
-                Text = text,
-                TextColor = Color.Black,
-                TextFont = new Font("Segoe UI", 11.25F, FontStyle.Regular, GraphicsUnit.Point),
-            };
-            button.Click += eventHandler;
-
-            _buttons.Add(button);
-            pnl_Menu.Controls.Add(button);
+            return;
         }
 
-        private void Scroll(int offset)
+        if (offset < 0 && pnl_Menu.Controls[^1].Location.Y + 60 < pnl_Menu.Height)
         {
-            if (pnl_Menu.Controls[0].Location.Y + offset == 59)
-            {
-                return;
-            }
-
-            if (pnl_Menu.Controls[^1].Location.Y + offset == -61)
-            {
-                return;
-            }
-
-            if (offset < 0 && pnl_Menu.Controls[^1].Location.Y + 60 < pnl_Menu.Height)
-            {
-                return;
-            }
-
-            foreach (Control control in pnl_Menu.Controls)
-            {
-                control.Location = new Point(control.Location.X, control.Location.Y + offset);
-            }
+            return;
         }
 
-        private void btn_ScrollUp_Click(object sender, EventArgs e)
+        foreach (Control control in pnl_Menu.Controls)
         {
-            Scroll(60);
+            control.Location = new Point(control.Location.X, control.Location.Y + offset);
+        }
+    }
+
+    private void btn_ScrollUp_Click(object sender, EventArgs e)
+    {
+        ScrollBy(60);
+    }
+
+    private void pnl_Menu_MouseWheel(object sender, MouseEventArgs eventArgs)
+    {
+        if (eventArgs.Delta > 0)
+        {
+            ScrollBy(60);
         }
 
-        private void pnl_Menu_MouseWheel(object sender, MouseEventArgs eventArgs)
+        if (eventArgs.Delta < 0)
         {
-            if (eventArgs.Delta > 0)
-            {
-                Scroll(60);
-            }
-
-            if (eventArgs.Delta < 0)
-            {
-                Scroll(-60);
-            }
+            ScrollBy(-60);
         }
+    }
 
-        private void btn_ScrollDown_Click(object sender, EventArgs e)
-        {
-            Scroll(-60);
-        }
+    private void btn_ScrollDown_Click(object sender, EventArgs e)
+    {
+        ScrollBy(-60);
     }
 }

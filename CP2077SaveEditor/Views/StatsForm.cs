@@ -9,21 +9,20 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using WolvenKit.RED4.Types;
 
-namespace CP2077SaveEditor.Views
+namespace CP2077SaveEditor.Views;
+
+public partial class StatsForm : Form
 {
-    public partial class StatsForm : Form
+    public StatsForm()
     {
-        public StatsForm()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
+    }
 
-        public void Init(string title, gameSavedStatsData gameSavedStatsData)
-        {
-            Text = title;
-            statsControl1.Init(gameSavedStatsData);
+    public void Init(string title, gameSavedStatsData gameSavedStatsData)
+    {
+        Text = title;
+        statsControl1.Init(gameSavedStatsData);
 
-            ShowDialog();
-        }
+        ShowDialog();
     }
 }

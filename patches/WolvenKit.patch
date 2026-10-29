@@ -1,0 +1,443 @@
+diff --git a/WolvenKit.RED4/Archive/IO/RedPackageReader.cs b/WolvenKit.RED4/Archive/IO/RedPackageReader.cs
+index b1f99738a..bcef27c33 100644
+--- a/WolvenKit.RED4/Archive/IO/RedPackageReader.cs
++++ b/WolvenKit.RED4/Archive/IO/RedPackageReader.cs
+@@ -1,3 +1,4 @@
++// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): unknown package fields keep their original RED type name. See NOTICE.md there.
+ using System.Reflection;
+ using System.Text;
+ using WolvenKit.Core.Extensions;
+@@ -98,7 +99,7 @@ public partial class RedPackageReader : Red4Reader
+             }
+ 
+             var (fieldType, _) = RedReflection.GetCSTypeFromRedType(redTypeName!);
+-            cls.AddDynamicProperty(varName, fieldType);
++            cls.AddDynamicProperty(varName, fieldType, redTypeName.GetResolvedText());
+ 
+             if (compiledPropertyData != null && compiledPropertyData.IsCustomReadNeeded(header))
+             {
+diff --git a/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs b/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs
+index 697a00765..eeb17d463 100644
+--- a/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs
++++ b/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs
+@@ -1,3 +1,4 @@
++// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): unchanged entries are written back byte-for-byte. See NOTICE.md there.
+ using System.Reflection;
+ using System.Text;
+ using WolvenKit.Common.FNV1A;
+@@ -12,6 +13,11 @@ public class PS2Entry
+ {
+     public ulong Id { get; set; }
+     public RedBaseClass Data { get; set; }
++
++    // The game writes default values and terminators that the writer omits, so unmodified
++    // entries are written back with their original bytes
++    internal byte[]? OriginalBuffer { get; set; }
++    internal byte[]? OriginalSerialized { get; set; }
+ }
+ 
+ public class PersistencySystem2 : INodeData
+@@ -261,10 +267,14 @@ public class PersistencySystem2Parser : INodeParser
+                         var instance1 = RedTypeManager.Create(type);
+                         if (size != 0)
+                         {
+-                            using var subMemory = new MemoryStream(reader.ReadBytes((int)size));
++                            var buffer = reader.ReadBytes((int)size);
++                            using var subMemory = new MemoryStream(buffer);
+                             using var subReader = new PersistencySystem2Reader(subMemory);
+ 
+                             subReader.ReadClass(instance1, size);
++
++                            entry.OriginalBuffer = buffer;
++                            entry.OriginalSerialized = SerializeEntryData(instance1);
+                         }
+                         entry.Data = instance1;
+ 
+@@ -321,16 +331,26 @@ public class PersistencySystem2Parser : INodeParser
+                 {
+                     writer.Write(SaveHashHelper.GetHashFromType(entry.Data.GetType()));
+ 
+-                    using var subMemory = new MemoryStream();
+-                    using var subWriter = new PersistencySystem2Writer(subMemory);
+-
+-                    subWriter.WriteClass(entry.Data);
++                    var bytes = SerializeEntryData(entry.Data);
++                    if (entry.OriginalBuffer != null && entry.OriginalSerialized != null && bytes.AsSpan().SequenceEqual(entry.OriginalSerialized))
++                    {
++                        bytes = entry.OriginalBuffer;
++                    }
+ 
+-                    var bytes = subMemory.ToArray()[..^8];
+                     writer.Write(bytes.Length);
+                     writer.Write(bytes);
+                 }
+             }
+         }
+     }
++
++    private static byte[] SerializeEntryData(RedBaseClass data)
++    {
++        using var subMemory = new MemoryStream();
++        using var subWriter = new PersistencySystem2Writer(subMemory);
++
++        subWriter.WriteClass(data);
++
++        return subMemory.ToArray()[..^8];
++    }
+ }
+diff --git a/WolvenKit.RED4/Types/Classes/gameBufferSlice.cs b/WolvenKit.RED4/Types/Classes/gameBufferSlice.cs
+new file mode 100644
+index 000000000..37b4a6cec
+--- /dev/null
++++ b/WolvenKit.RED4/Types/Classes/gameBufferSlice.cs
+@@ -0,0 +1,31 @@
++// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): backported unchanged from WolvenKit main (patch 2.5 stats format). See NOTICE.md there.
++using static WolvenKit.RED4.Types.Enums;
++
++namespace WolvenKit.RED4.Types
++{
++	public partial class gameBufferSlice : RedBaseClass
++	{
++		[Ordinal(0)] 
++		[RED("offset")] 
++		public CUInt32 Offset
++		{
++			get => GetPropertyValue<CUInt32>();
++			set => SetPropertyValue<CUInt32>(value);
++		}
++
++		[Ordinal(1)] 
++		[RED("combined")] 
++		public CUInt32 Combined
++		{
++			get => GetPropertyValue<CUInt32>();
++			set => SetPropertyValue<CUInt32>(value);
++		}
++
++		public gameBufferSlice()
++		{
++			PostConstruct();
++		}
++
++		partial void PostConstruct();
++	}
++}
+diff --git a/WolvenKit.RED4/Types/Classes/gameSavedStatsDataOptimized.cs b/WolvenKit.RED4/Types/Classes/gameSavedStatsDataOptimized.cs
+new file mode 100644
+index 000000000..754f29b2d
+--- /dev/null
++++ b/WolvenKit.RED4/Types/Classes/gameSavedStatsDataOptimized.cs
+@@ -0,0 +1,75 @@
++// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): backported unchanged from WolvenKit main (patch 2.5 stats format). See NOTICE.md there.
++using static WolvenKit.RED4.Types.Enums;
++
++namespace WolvenKit.RED4.Types
++{
++	public partial class gameSavedStatsDataOptimized : RedBaseClass
++	{
++		[Ordinal(0)] 
++		[RED("statModifiers")] 
++		public CArray<CHandle<gameStatModifierData_Deprecated>> StatModifiers
++		{
++			get => GetPropertyValue<CArray<CHandle<gameStatModifierData_Deprecated>>>();
++			set => SetPropertyValue<CArray<CHandle<gameStatModifierData_Deprecated>>>(value);
++		}
++
++		[Ordinal(1)] 
++		[RED("bufferSliceIndices")] 
++		public CArray<CUInt16> BufferSliceIndices
++		{
++			get => GetPropertyValue<CArray<CUInt16>>();
++			set => SetPropertyValue<CArray<CUInt16>>(value);
++		}
++
++		[Ordinal(2)] 
++		[RED("inactiveStatsIndices")] 
++		public CArray<CUInt16> InactiveStatsIndices
++		{
++			get => GetPropertyValue<CArray<CUInt16>>();
++			set => SetPropertyValue<CArray<CUInt16>>(value);
++		}
++
++		[Ordinal(3)] 
++		[RED("entityHash")] 
++		public CUInt64 EntityHash
++		{
++			get => GetPropertyValue<CUInt64>();
++			set => SetPropertyValue<CUInt64>(value);
++		}
++
++		[Ordinal(4)] 
++		[RED("seed")] 
++		public CUInt32 Seed
++		{
++			get => GetPropertyValue<CUInt32>();
++			set => SetPropertyValue<CUInt32>(value);
++		}
++
++		[Ordinal(5)] 
++		[RED("recordIDIndex")] 
++		public CUInt16 RecordIDIndex
++		{
++			get => GetPropertyValue<CUInt16>();
++			set => SetPropertyValue<CUInt16>(value);
++		}
++
++		[Ordinal(6)] 
++		[RED("idType")] 
++		public CEnum<gameStatIDType> IdType
++		{
++			get => GetPropertyValue<CEnum<gameStatIDType>>();
++			set => SetPropertyValue<CEnum<gameStatIDType>>(value);
++		}
++
++		public gameSavedStatsDataOptimized()
++		{
++			StatModifiers = new();
++			BufferSliceIndices = new();
++			InactiveStatsIndices = new();
++
++			PostConstruct();
++		}
++
++		partial void PostConstruct();
++	}
++}
+diff --git a/WolvenKit.RED4/Types/Classes/gameStatsStateMapStructure.cs b/WolvenKit.RED4/Types/Classes/gameStatsStateMapStructure.cs
+index 8751216e2..f5908687d 100644
+--- a/WolvenKit.RED4/Types/Classes/gameStatsStateMapStructure.cs
++++ b/WolvenKit.RED4/Types/Classes/gameStatsStateMapStructure.cs
+@@ -1,3 +1,4 @@
++// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): patch 2.5 fields backported from WolvenKit main. See NOTICE.md there.
+ using static WolvenKit.RED4.Types.Enums;
+ 
+ namespace WolvenKit.RED4.Types
+@@ -20,10 +21,54 @@ namespace WolvenKit.RED4.Types
+ 			set => SetPropertyValue<CArray<gameSavedStatsData>>(value);
+ 		}
+ 
++		[Ordinal(2)] 
++		[RED("valuesOptimized")] 
++		public CArray<gameSavedStatsDataOptimized> ValuesOptimized
++		{
++			get => GetPropertyValue<CArray<gameSavedStatsDataOptimized>>();
++			set => SetPropertyValue<CArray<gameSavedStatsDataOptimized>>(value);
++		}
++
++		[Ordinal(3)] 
++		[RED("sharedBufferSlices")] 
++		public CArray<gameBufferSlice> SharedBufferSlices
++		{
++			get => GetPropertyValue<CArray<gameBufferSlice>>();
++			set => SetPropertyValue<CArray<gameBufferSlice>>(value);
++		}
++
++		[Ordinal(4)] 
++		[RED("sharedInactiveStats")] 
++		public CArray<CEnum<gamedataStatType>> SharedInactiveStats
++		{
++			get => GetPropertyValue<CArray<CEnum<gamedataStatType>>>();
++			set => SetPropertyValue<CArray<CEnum<gamedataStatType>>>(value);
++		}
++
++		[Ordinal(5)] 
++		[RED("sharedRecordId")] 
++		public CArray<TweakDBID> SharedRecordId
++		{
++			get => GetPropertyValue<CArray<TweakDBID>>();
++			set => SetPropertyValue<CArray<TweakDBID>>(value);
++		}
++
++		[Ordinal(6)] 
++		[RED("sharedDataBuffer")] 
++		public DataBuffer SharedDataBuffer
++		{
++			get => GetPropertyValue<DataBuffer>();
++			set => SetPropertyValue<DataBuffer>(value);
++		}
++
+ 		public gameStatsStateMapStructure()
+ 		{
+ 			Keys = new();
+ 			Values = new();
++			ValuesOptimized = new();
++			SharedBufferSlices = new();
++			SharedInactiveStats = new();
++			SharedRecordId = new();
+ 
+ 			PostConstruct();
+ 		}
+diff --git a/WolvenKit.RED4/Types/Enums/cp77enums.cs b/WolvenKit.RED4/Types/Enums/cp77enums.cs
+index 30d7a911c..8eb3682a7 100644
+--- a/WolvenKit.RED4/Types/Enums/cp77enums.cs
++++ b/WolvenKit.RED4/Types/Enums/cp77enums.cs
+@@ -1,3 +1,4 @@
++// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): added patch 2.5 values to gamedataEquipmentArea and gamedataStatType. See NOTICE.md there.
+ // ReSharper disable InconsistentNaming
+ 
+ namespace WolvenKit.RED4.Types;
+@@ -10541,7 +10542,8 @@ public static partial class Enums
+ 		WeaponLeft = 42,
+ 		WeaponWheel = 43,
+ 		Count = 44,
+-		Invalid = 45
++		Invalid = 45,
++		ArmsCWStyle = 46
+ 	}
+ 
+ 	public enum gamedataEthnicity
+@@ -13867,7 +13869,9 @@ public static partial class Enums
+ 		CPO_Armor = 1707,
+ 		CPO_NPC_Importance = 1708,
+ 		Count = 1709,
+-		Invalid = 1710
++		Invalid = 1710,
++		BaseNeuralCapacityExceeded = 1711,
++		CalculatedCurrentNeuralCapacity = 1712
+ 	}
+ 
+ 	public enum gamedataStatType_1300DEPRECATED
+diff --git a/WolvenKit.RED4/Types/IO/Red4Reader.cs b/WolvenKit.RED4/Types/IO/Red4Reader.cs
+index b12e82a40..b83201e04 100644
+--- a/WolvenKit.RED4/Types/IO/Red4Reader.cs
++++ b/WolvenKit.RED4/Types/IO/Red4Reader.cs
+@@ -1,3 +1,4 @@
++// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): enum values unknown to the generated enums are kept instead of dropped. See NOTICE.md there.
+ using System.Reflection;
+ using System.Runtime.CompilerServices;
+ using System.Text;
+@@ -332,7 +333,14 @@ public partial class Red4Reader : IErrorHandler, IDataCollector, IDisposable
+         if (enumString == null)
+         {
+             var args = new InvalidEnumValueEventArgs(redTypeInfos[0].RedObjectType, value!);
+-            if (!HandleParsingError(args))
++
++            // Keep values unknown to the generated enums (newer game versions, mods), so they are written back unchanged
++            if (value.GetResolvedText() is { } unknownValue && enumInfo.AddDynamicValue(unknownValue) is { } dynamicName)
++            {
++                args.Value = (Enum)Enum.Parse(redTypeInfos[0].RedObjectType, dynamicName);
++            }
++
++            if (!HandleParsingError(args) && args.Value == null)
+             {
+                 throw new Exception($"CEnum \"{redTypeInfos[0].RedObjectType.Name}.{value}\" could not be found!");
+             }
+diff --git a/WolvenKit.RED4/Types/RedBaseClass.cs b/WolvenKit.RED4/Types/RedBaseClass.cs
+index 4458c9814..1aa746c98 100644
+--- a/WolvenKit.RED4/Types/RedBaseClass.cs
++++ b/WolvenKit.RED4/Types/RedBaseClass.cs
+@@ -1,3 +1,4 @@
++// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): dynamic properties can carry their RED type name. See NOTICE.md there.
+ using System.Runtime.CompilerServices;
+ using WolvenKit.Core.Extensions;
+ using WolvenKit.RED4.Types.Exceptions;
+@@ -213,14 +214,14 @@ public partial class RedBaseClass : IRedClass, IRedCloneable, IEquatable<RedBase
+ 
+     private readonly Dictionary<string, ExtendedPropertyInfo> _dynamicProperties = new();
+ 
+-    public ExtendedPropertyInfo AddDynamicProperty(string redName, Type type)
++    public ExtendedPropertyInfo AddDynamicProperty(string redName, Type type, string? redType = null)
+     {
+         if (_dynamicProperties.ContainsKey(redName))
+         {
+             throw new TodoException("Property already defined");
+         }
+ 
+-        var property = new ExtendedPropertyInfo(RedReflection.GetTypeInfo(GetType()), redName, type);
++        var property = new ExtendedPropertyInfo(RedReflection.GetTypeInfo(GetType()), redName, type, redType);
+ 
+         _dynamicProperties.Add(redName, property);
+ 
+@@ -236,7 +237,7 @@ public partial class RedBaseClass : IRedClass, IRedCloneable, IEquatable<RedBase
+ 
+         var property = _dynamicProperties[oldName];
+         var value = GetProperty(oldName);
+-        var newProperty = new ExtendedPropertyInfo(RedReflection.GetTypeInfo(GetType()), newName, property.Type);
++        var newProperty = new ExtendedPropertyInfo(RedReflection.GetTypeInfo(GetType()), newName, property.Type, property.RedType);
+ 
+         _dynamicProperties.Add(newName, newProperty);       
+         _dynamicProperties.Remove(oldName);
+diff --git a/WolvenKit.RED4/Types/Reflection/ExtendedEnumInfo.cs b/WolvenKit.RED4/Types/Reflection/ExtendedEnumInfo.cs
+index 650211f1f..758123695 100644
+--- a/WolvenKit.RED4/Types/Reflection/ExtendedEnumInfo.cs
++++ b/WolvenKit.RED4/Types/Reflection/ExtendedEnumInfo.cs
+@@ -1,4 +1,5 @@
+-﻿using System.Reflection;
++﻿// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): added AddDynamicValue for enum values unknown to the generated enums. See NOTICE.md there.
++using System.Reflection;
+ 
+ namespace WolvenKit.RED4.Types;
+ 
+@@ -74,6 +75,42 @@ public class ExtendedEnumInfo
+         return null;
+     }
+ 
++    /// <summary>
++    /// Registers an enum value that is unknown to the generated enums (e.g. added by a newer game version or a mod).
++    /// It gets mapped to an unused numeric value, so it can be stored in the enum and written back with its original name.
++    /// </summary>
++    public string? AddDynamicValue(string redName)
++    {
++        if (IsBitfield)
++        {
++            return null;
++        }
++
++        lock (RedNames)
++        {
++            var existing = GetCSNameFromRedName(redName);
++            if (existing != null)
++            {
++                return existing;
++            }
++
++            var underlyingType = Enum.GetUnderlyingType(Type);
++            var maxValue = Convert.ToDecimal(underlyingType.GetField("MaxValue")!.GetValue(null));
++
++            var nextValue = Enum.GetValues(Type).Cast<object>().Select(Convert.ToDecimal).DefaultIfEmpty(0).Max() + 1;
++            nextValue = Math.Max(nextValue, RedNames.Values.Select(x => decimal.TryParse(x, out var d) ? d + 1 : 0).DefaultIfEmpty(0).Max());
++            if (nextValue > maxValue)
++            {
++                return null;
++            }
++
++            var csName = Enum.ToObject(Type, Convert.ChangeType(nextValue, underlyingType)).ToString();
++            RedNames.Add(redName, csName);
++
++            return csName;
++        }
++    }
++
+     public string GetRedNameFromCSName(string valueName)
+     {
+         if (RedNames.ContainsValue(valueName))
+diff --git a/WolvenKit.RED4/Types/Reflection/ExtendedPropertyInfo.cs b/WolvenKit.RED4/Types/Reflection/ExtendedPropertyInfo.cs
+index 58c61d3fc..64a6c5f55 100644
+--- a/WolvenKit.RED4/Types/Reflection/ExtendedPropertyInfo.cs
++++ b/WolvenKit.RED4/Types/Reflection/ExtendedPropertyInfo.cs
+@@ -1,4 +1,5 @@
+-﻿using System.Reflection;
++﻿// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): dynamic properties can carry their RED type name. See NOTICE.md there.
++using System.Reflection;
+ 
+ namespace WolvenKit.RED4.Types;
+ 
+@@ -17,7 +18,7 @@ public class ExtendedPropertyInfo
+         RedType = type;
+     }
+ 
+-    public ExtendedPropertyInfo(ExtendedTypeInfo containingType, string name, Type type)
++    public ExtendedPropertyInfo(ExtendedTypeInfo containingType, string name, Type type, string? redType = null)
+     {
+         IsDynamic = true;
+ 
+@@ -27,7 +28,8 @@ public class ExtendedPropertyInfo
+         Type = type;
+ 
+         RedName = Name;
+-        RedType = RedReflection.GetRedTypeFromCSType(Type);
++        // Keep the original RED type name if known, otherwise unknown classes would be written as "DynamicBaseClass"
++        RedType = redType ?? RedReflection.GetRedTypeFromCSType(Type);
+     }
+ 
+     public ExtendedPropertyInfo(ExtendedTypeInfo containingType, PropertyInfo propertyInfo)

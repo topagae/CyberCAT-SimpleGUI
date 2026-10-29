@@ -131,7 +131,9 @@ namespace CP2077SaveEditor.Views
             // 
             tssl_Info.Name = "tssl_Info";
             tssl_Info.Size = new System.Drawing.Size(41, 17);
-            tssl_Info.Text = "v0.28c";
+            tssl_Info.Text = "version (set in Form2 constructor)";
+            tssl_Info.IsLink = true;
+            tssl_Info.Click += tssl_Info_Click;
             // 
             // Form2
             // 
@@ -146,7 +148,7 @@ namespace CP2077SaveEditor.Views
             Controls.Add(openSaveButton);
             Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
             Name = "Form2";
-            Text = "Cyberpunk 2077 Save Editor (CyberCAT-SimpleGUI)";
+            Text = "Cyberpunk 2077 Save Editor";
             FormClosing += Form2_FormClosing;
             Load += Form2_Load;
             statusStrip1.ResumeLayout(false);

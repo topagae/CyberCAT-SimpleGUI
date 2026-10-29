@@ -6,7 +6,24 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
+
+    <!-- The editor shows InformationalVersion in its title and status bar -->
+    <Version>0.29.0</Version>
+    <InformationalVersion>0.29a</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Product>CyberCAT-SimpleGUI</Product>
+    <Description>Cyberpunk 2077 save editor, patch 2.5 update (unofficial fork of CyberCAT-SimpleGUI by Deweh)</Description>
+    <Copyright>Copyright (c) 2021 DeweySalt and contributors</Copyright>
+
+    <!-- Only ship English resources of the framework -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <!-- Docs and licenses for release builds, see Properties\PublishProfiles\win-x64.pubxml -->
+  <ItemGroup>
+    <None Include="..\README.md;..\RELEASE_NOTES.md;..\NOTICE.md;..\LICENSE" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\licenses\**" LinkBase="licenses" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Resources\*" />

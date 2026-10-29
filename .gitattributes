@@ -61,3 +61,6 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+# Applied to the WolvenKit submodule by Directory.Build.targets, keep it byte-exact
+patches/*.patch -text

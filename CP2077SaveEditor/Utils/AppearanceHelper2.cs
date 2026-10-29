@@ -116,23 +116,23 @@ public class AppearanceHelper2
     }
 
     [Browsable(false)]
-    public string HairStyle
+    public string? HairStyle
     {
-        get => (string)GetValue();
+        get => (string?)GetValue();
         set => SetValue(value);
     }
 
     [Browsable(false)]
-    public string HairColor
+    public string? HairColor
     {
-        get => (string)GetValue();
+        get => (string?)GetValue();
         set => SetValue(value);
     }
 
     [Browsable(false)]
-    public string EyeColor
+    public string? EyeColor
     {
-        get => (string)GetValue();
+        get => (string?)GetValue();
         set => SetValue(value);
     }
 
