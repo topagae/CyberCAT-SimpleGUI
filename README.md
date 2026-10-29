@@ -4,6 +4,15 @@ A save editor for Cyberpunk 2077, updated to work with **patch 2.5** saves.
 
 This is an **unofficial fork** of [CyberCAT-SimpleGUI by Deweh (DeweySalt)](https://github.com/Deweh/CyberCAT-SimpleGUI). The original editor was a simplified offshoot of SirBitesalot's [CyberCAT](https://github.com/WolvenKit/CyberCAT). The original stopped working with patch 2.5 saves, and this fork fixes that. All credit for the editor itself goes to the original authors, see [Credits](#credits).
 
+## ⬇️ Download (no coding needed)
+
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29a-win-x64.zip** under **Assets**.
+2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
+3. Open the extracted `CP2077SaveEditor-v0.29a` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
+
+Requires 64-bit Windows 10 or 11.
+
 ## ⚠️ Read this first
 
 - **Back up your saves before using this.** Copy the whole save folder from `%USERPROFILE%\Saved Games\CD Projekt Red\Cyberpunk 2077\` to somewhere safe.
@@ -54,7 +63,7 @@ Patch 1.x           | Not in v0.29a  | Use the [original releases](https://githu
 
 ## Usage
 
-1. Extract the zip anywhere and run **CP2077SaveEditor.exe**. It's self-contained, so you don't need to install .NET.
+1. Download and extract the zip (see Download at the top), then run **CP2077SaveEditor.exe**. It's self-contained, so you don't need to install .NET.
 2. Click **"Load Save"** and pick a `sav.dat` from your save folder.
 3. Make your changes.
     - Double-click items in your inventory to edit them.

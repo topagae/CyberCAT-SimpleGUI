@@ -2,7 +2,16 @@
 
 The CyberCAT-SimpleGUI save editor works again. This is an unofficial fork of Deweh's [CyberCAT-SimpleGUI](https://github.com/Deweh/CyberCAT-SimpleGUI), which stopped working with patch 2.5 saves.
 
-Download the zip from the Releases page of this repository. The full source is in this repository.
+The full source is at https://github.com/topagae/CyberCAT-SimpleGUI.
+
+## ⬇️ Download (no coding needed)
+
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29a-win-x64.zip** under **Assets**.
+2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
+3. Open the extracted `CP2077SaveEditor-v0.29a` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
+
+Requires 64-bit Windows 10 or 11.
 
 ## ⚠️ Read this first
 
