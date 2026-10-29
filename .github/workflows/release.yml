@@ -1,0 +1,105 @@
+# Builds the release zip from source. Runs for version tags (and creates or updates the GitHub release) and manually.
+#
+# Code signing through SignPath Foundation is switched on by setting the repository variable SIGNPATH_ORGANIZATION_ID
+# and the secret SIGNPATH_API_TOKEN (Settings > Secrets and variables > Actions). Without them the release is unsigned.
+name: Build release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      # WolvenKit contains paths longer than 260 characters
+      - name: Enable long paths
+        run: git config --system core.longpaths true
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Also applies patches/WolvenKit.patch, see Directory.Build.targets
+      - name: Publish
+        run: dotnet publish CP2077SaveEditor/CP2077SaveEditor.csproj -p:PublishProfile=win-x64
+
+      - name: Stage release folder
+        id: stage
+        shell: pwsh
+        run: |
+          $version = (Get-ChildItem releases -Directory | Select-Object -First 1).Name
+          $name = "CP2077SaveEditor-$version"
+          New-Item -ItemType Directory dist | Out-Null
+          Move-Item "releases/$version" "dist/$name"
+          "name=$name" >> $env:GITHUB_OUTPUT
+
+      - name: Upload unsigned build
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.stage.outputs.name }}-unsigned
+          path: dist/
+
+      # The project and policy slugs come from the SignPath project setup, check them there
+      - name: Sign with SignPath
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: CyberCAT-SimpleGUI
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Create zip
+        id: zip
+        shell: pwsh
+        run: |
+          $source = if (Test-Path signed) { 'signed' } else { 'dist' }
+          $zip = "${{ steps.stage.outputs.name }}-win-x64.zip"
+          # 7-Zip writes portable paths, Compress-Archive doesn't always
+          7z a -tzip -mx=9 $zip "./$source/*" | Out-Null
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+          "sha256=$((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower())" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.zip.outputs.zip }}
+          path: ${{ steps.zip.outputs.zip }}
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $zip = '${{ steps.zip.outputs.zip }}'
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $zip --clobber
+          } else {
+            $checksum = @'
+
+          ## Checksum
+
+          SHA-256 of `{0}`:
+
+          ```
+          {1}
+          ```
+          '@ -f $zip, '${{ steps.zip.outputs.sha256 }}'
+            Set-Content notes.md ((Get-Content RELEASE_NOTES.md -Raw) + $checksum)
+            gh release create $tag $zip --title "$tag" --notes-file notes.md
+          }

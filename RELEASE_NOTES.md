@@ -67,6 +67,10 @@ If something goes wrong, the editor writes an `error.txt` next to the exe. Pleas
 
 This fork isn't endorsed by the original authors. I've contacted them, and this note will be updated.
 
+## Code signing policy
+
+See the [code signing policy](https://github.com/topagae/CyberCAT-SimpleGUI#code-signing-policy) in the README. This release is unsigned.
+
 ## License
 
 The editor's code is MIT licensed. Because it's built with WolvenKit (GPL-3.0), the released program is distributed under the GPL-3.0, and the full source, including the WolvenKit changes, is in this repository. [NOTICE.md](NOTICE.md) lists every change.

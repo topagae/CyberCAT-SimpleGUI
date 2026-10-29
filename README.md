@@ -72,6 +72,16 @@ Patch 1.x           | Not in v0.29a  | Use the [original releases](https://githu
 
 The window opens right away. Loading the game's name tables takes a few more seconds, and **"Load Save"** becomes clickable when that finishes. The editor uses around 1.7 GB of RAM.
 
+## Code signing policy
+
+Releases are currently **unsigned**, so Windows SmartScreen may warn when you first run the editor. This project has applied for free code signing from SignPath Foundation.
+
+- **Builds:** release zips are built from this repository's source by GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)). Only the editor's own binaries (CP2077SaveEditor and WolvenKit, built from source here) will be signed.
+- **Team roles:**
+  - Committers and reviewers: [topagae](https://github.com/topagae)
+  - Approvers: [topagae](https://github.com/topagae)
+- **Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
+
 ## Credits
 
 - **[CyberCAT-SimpleGUI](https://github.com/Deweh/CyberCAT-SimpleGUI)** by Deweh (DeweySalt), with contributions from seberoth, Merijn Hendriks, Alain Dupuis and others. It's the editor this fork is based on.
