@@ -80,7 +80,7 @@ Releases are currently **unsigned**, so Windows SmartScreen may warn when you fi
 - **Team roles:**
   - Committers and reviewers: [topagae](https://github.com/topagae)
   - Approvers: [topagae](https://github.com/topagae)
-- **Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
+- **Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. See [PRIVACY.md](PRIVACY.md).
 
 ## Credits
 
