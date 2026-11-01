@@ -25,6 +25,17 @@
     <None Include="..\licenses\**" LinkBase="licenses" CopyToPublishDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
 
+  <!--
+    WolvenKit.Core ships native libraries the editor never loads: wwtools (Wwise audio conversion) and the Linux/macOS
+    builds. Unsigned native binaries draw antivirus false positives, so they are left out of the release.
+    kraken.dll stays, saves are compressed with it.
+  -->
+  <Target Name="RemoveUnusedNativeLibraries" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)%(Extension)' == 'wwtools.dll' Or '%(Extension)' == '.so' Or '%(Extension)' == '.dylib'" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <Resource Include="Resources\*" />
   </ItemGroup>
