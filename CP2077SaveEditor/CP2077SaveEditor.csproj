@@ -8,8 +8,8 @@
     <Platforms>x64</Platforms>
 
     <!-- The editor shows InformationalVersion in its title and status bar -->
-    <Version>0.29.0</Version>
-    <InformationalVersion>0.29a</InformationalVersion>
+    <Version>0.29.1</Version>
+    <InformationalVersion>0.29b</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>CyberCAT-SimpleGUI</Product>
     <Description>Cyberpunk 2077 save editor, patch 2.5 update (unofficial fork of CyberCAT-SimpleGUI by Deweh)</Description>

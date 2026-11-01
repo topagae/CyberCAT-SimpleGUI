@@ -1,4 +1,4 @@
-# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29a)
+# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29b)
 
 A save editor for Cyberpunk 2077, updated to work with **patch 2.5** saves.
 
@@ -6,9 +6,9 @@ This is an **unofficial fork** of [CyberCAT-SimpleGUI by Deweh (DeweySalt)](http
 
 ## ⬇️ Download (no coding needed)
 
-1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29a-win-x64.zip** under **Assets**.
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29b-win-x64.zip** under **Assets**.
 2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
-3. Open the extracted `CP2077SaveEditor-v0.29a` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+3. Open the extracted `CP2077SaveEditor-v0.29b` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
 4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
 
 Requires 64-bit Windows 10 or 11.

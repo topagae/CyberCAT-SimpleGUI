@@ -18,6 +18,10 @@
 
 The editor's own source code is MIT licensed. The released `CP2077SaveEditor.exe` is built together with WolvenKit, which is GPL-3.0, so the program as distributed is covered by the GPL-3.0. Anyone who redistributes the binaries must also make the full corresponding source available, including the modified WolvenKit files listed below.
 
+## Changes in v0.29b (2026-11)
+
+- `CP2077SaveEditor/CP2077SaveEditor.csproj`: release builds leave out WolvenKit's `wwtools.dll`, `libwwtools.so`, `libkraken.so` and `libkraken.dylib`, which the editor never loads. New version number.
+
 ## Changes in v0.29a (2026-10)
 
 ### Editor (`CP2077SaveEditor`, `ResourceGenerator`)
