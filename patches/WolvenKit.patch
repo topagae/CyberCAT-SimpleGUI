@@ -17,15 +17,18 @@ index b1f99738a..bcef27c33 100644
              if (compiledPropertyData != null && compiledPropertyData.IsCustomReadNeeded(header))
              {
 diff --git a/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs b/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs
-index 697a00765..eeb17d463 100644
+index 697a00765..b8e9e7bb0 100644
 --- a/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs
 +++ b/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs
-@@ -1,3 +1,4 @@
+@@ -1,4 +1,7 @@
 +// Modified 2026-10 for CyberCAT-SimpleGUI v0.29a (Cyberpunk 2077 patch 2.5 support): unchanged entries are written back byte-for-byte. See NOTICE.md there.
++// Modified 2026-11 for CyberCAT-SimpleGUI v0.29c: properties added by script mods are kept instead of the whole entry being left unparsed.
  using System.Reflection;
++using System.Runtime.CompilerServices;
  using System.Text;
  using WolvenKit.Common.FNV1A;
-@@ -12,6 +13,11 @@ public class PS2Entry
+ using WolvenKit.RED4.IO;
+@@ -12,6 +15,11 @@ public class PS2Entry
  {
      public ulong Id { get; set; }
      public RedBaseClass Data { get; set; }
@@ -37,7 +40,220 @@ index 697a00765..eeb17d463 100644
  }
  
  public class PersistencySystem2 : INodeData
-@@ -261,10 +267,14 @@ public class PersistencySystem2Parser : INodeParser
+@@ -27,6 +35,47 @@ public class UnknownRedClass : RedBaseClass
+     public byte[] Buffer { get; set; } = Array.Empty<byte>();
+ }
+ 
++// A property the class doesn't define, usually a persistent field added by a script mod (redscript @addField).
++// After is the property it followed, so it's written back in the same place.
++public record RawProperty(ulong NameHash, ulong TypeHash, byte[] Value, string? After);
++
++public static class RawProperties
++{
++    private static readonly ConditionalWeakTable<RedBaseClass, List<RawProperty>> s_properties = new();
++    private static Dictionary<ulong, string>? s_redTypeNames;
++
++    public static IReadOnlyList<RawProperty> Get(RedBaseClass instance) =>
++        s_properties.TryGetValue(instance, out var list) ? list : Array.Empty<RawProperty>();
++
++    internal static void Add(RedBaseClass instance, RawProperty property) =>
++        s_properties.GetOrCreateValue(instance).Add(property);
++
++    // Red type names by hash, for the types of unknown properties
++    internal static string? GetRedTypeName(ulong hash)
++    {
++        if (s_redTypeNames == null)
++        {
++            var names = new Dictionary<ulong, string>();
++            void AddName(string name) => names.TryAdd(FNV1A64HashAlgorithm.HashString(name), name);
++
++            // Includes primitives. Rarer types (static arrays, arrays of arrays) are missing and read like mod-defined types.
++            foreach (var redName in RedReflection.GetTypes().Keys)
++            {
++                AddName(redName);
++                AddName("handle:" + redName);
++                AddName("whandle:" + redName);
++                AddName("array:" + redName);
++                AddName("array:handle:" + redName);
++                AddName("array:whandle:" + redName);
++            }
++
++            s_redTypeNames = names;
++        }
++
++        return s_redTypeNames.TryGetValue(hash, out var result) ? result : null;
++    }
++}
++
+ public class PersistencySystem2Reader : Red4Reader
+ {
+     public PersistencySystem2Reader(Stream input) : base(input)
+@@ -49,6 +98,7 @@ public class PersistencySystem2Reader : Red4Reader
+ 
+     public override void ReadClass(RedBaseClass instance, uint size)
+     {
++        string? lastPropertyName = null;
+         while (Remaining != 0)
+         {
+             var propNameHash = BaseReader.ReadUInt64();
+@@ -58,7 +108,17 @@ public class PersistencySystem2Reader : Red4Reader
+             }
+ 
+             var propertyInfo = SaveHashHelper.GetPropertyInfo(instance.GetType(), propNameHash);
+-            ArgumentNullException.ThrowIfNull(propertyInfo?.RedName);
++            if (propertyInfo?.RedName == null)
++            {
++                var unknownTypeHash = BaseReader.ReadUInt64();
++                var start = BaseStream.Position;
++                SkipValue(unknownTypeHash);
++
++                var length = (int)(BaseStream.Position - start);
++                BaseStream.Position = start;
++                RawProperties.Add(instance, new RawProperty(propNameHash, unknownTypeHash, BaseReader.ReadBytes(length), lastPropertyName));
++                continue;
++            }
+ 
+             var redTypeHash = SaveHashHelper.GetRedTypeHash(propertyInfo);
+             var propTypeHash = BaseReader.ReadUInt64();
+@@ -72,9 +132,75 @@ public class PersistencySystem2Reader : Red4Reader
+ 
+             var value = Read(redTypeInfos, (uint)Remaining);
+             instance.SetProperty(propertyInfo.RedName, value);
++            lastPropertyName = propertyInfo.RedName;
++        }
++    }
++
++    // Moves past a value without creating it, handles can point to classes defined by script mods.
++    // Unreadable data throws, and the whole entry is then kept as an UnknownRedClass.
++    private void SkipValue(ulong typeHash)
++    {
++        var redTypeName = RawProperties.GetRedTypeName(typeHash);
++        if (redTypeName != null)
++        {
++            SkipValue(redTypeName);
++            return;
++        }
++
++        // A type defined by a script mod, so a handle or an array of handles. Arrays start with their element count,
++        // handles with a class hash, which is never that small.
++        var count = BaseReader.ReadUInt32();
++        if (count > Remaining / 16)
++        {
++            BaseStream.Position -= 4;
++            SkipHandle();
++            return;
++        }
++
++        for (var i = 0; i < count; i++)
++        {
++            SkipHandle();
+         }
+     }
+ 
++    private void SkipValue(string redTypeName)
++    {
++        if (redTypeName.StartsWith("handle:") || redTypeName.StartsWith("whandle:"))
++        {
++            SkipHandle();
++            return;
++        }
++
++        if (redTypeName.StartsWith("array:"))
++        {
++            var count = BaseReader.ReadUInt32();
++            for (var i = 0; i < count; i++)
++            {
++                SkipValue(redTypeName["array:".Length..]);
++            }
++            return;
++        }
++
++        Read(RedReflection.GetRedTypeInfos(redTypeName), (uint)Remaining);
++    }
++
++    private void SkipHandle()
++    {
++        // Class hash, then the properties
++        BaseReader.ReadUInt64();
++        while (Remaining != 0)
++        {
++            if (BaseReader.ReadUInt64() == 0)
++            {
++                return;
++            }
++
++            SkipValue(BaseReader.ReadUInt64());
++        }
++
++        throw new EndOfStreamException();
++    }
++
+     public override RedBaseClass ReadClass(Type type, uint size)
+     {
+         var instance = RedTypeManager.Create(type);
+@@ -152,25 +278,56 @@ public class PersistencySystem2Writer : Red4Writer
+     public override void WriteClass(RedBaseClass instance)
+     {
+         var typeInfo = RedReflection.GetTypeInfo(instance.GetType());
++        var rawProperties = RawProperties.Get(instance);
++
++        WriteRawProperties(rawProperties, null);
+         foreach (var propertyInfo in typeInfo.GetWritableProperties())
+         {
+             ArgumentNullException.ThrowIfNull(propertyInfo.RedName);
+ 
+             var value = instance.GetProperty(propertyInfo.RedName);
+-            if (!typeInfo.SerializeDefault && !propertyInfo.SerializeDefault && propertyInfo.IsDefault(value))
++            if (typeInfo.SerializeDefault || propertyInfo.SerializeDefault || !propertyInfo.IsDefault(value))
+             {
+-                continue;
++                BaseWriter.Write(FNV1A64HashAlgorithm.HashString(propertyInfo.RedName));
++                BaseWriter.Write(SaveHashHelper.GetRedTypeHash(propertyInfo));
++
++                Write(value);
+             }
+ 
+-            BaseWriter.Write(FNV1A64HashAlgorithm.HashString(propertyInfo.RedName));
+-            BaseWriter.Write(SaveHashHelper.GetRedTypeHash(propertyInfo));
++            WriteRawProperties(rawProperties, propertyInfo.RedName);
++        }
+ 
+-            Write(value);
++        // Fields that followed a property this class doesn't write
++        if (rawProperties.Count > 0)
++        {
++            var propertyNames = typeInfo.GetWritableProperties().Select(x => x.RedName).ToHashSet();
++            foreach (var property in rawProperties.Where(x => x.After != null && !propertyNames.Contains(x.After)))
++            {
++                WriteRawProperty(property);
++            }
+         }
+ 
+         BaseWriter.Write((ulong)0);
+     }
+ 
++    private void WriteRawProperties(IReadOnlyList<RawProperty> rawProperties, string? after)
++    {
++        foreach (var property in rawProperties)
++        {
++            if (property.After == after)
++            {
++                WriteRawProperty(property);
++            }
++        }
++    }
++
++    private void WriteRawProperty(RawProperty property)
++    {
++        BaseWriter.Write(property.NameHash);
++        BaseWriter.Write(property.TypeHash);
++        BaseWriter.Write(property.Value);
++    }
++
+     public override void Write(CName val) => BaseWriter.Write((ulong)val);
+     public override void Write(NodeRef val) => BaseWriter.Write((ulong)val);
+     public override void Write(IRedEnum instance)
+@@ -261,10 +418,14 @@ public class PersistencySystem2Parser : INodeParser
                          var instance1 = RedTypeManager.Create(type);
                          if (size != 0)
                          {
@@ -53,7 +269,7 @@ index 697a00765..eeb17d463 100644
                          }
                          entry.Data = instance1;
  
-@@ -321,16 +331,26 @@ public class PersistencySystem2Parser : INodeParser
+@@ -321,16 +482,26 @@ public class PersistencySystem2Parser : INodeParser
                  {
                      writer.Write(SaveHashHelper.GetHashFromType(entry.Data.GetType()));
  

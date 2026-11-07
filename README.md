@@ -1,4 +1,4 @@
-# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29b)
+# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29c)
 
 A save editor for Cyberpunk 2077, updated to work with **patch 2.5** saves.
 
@@ -6,9 +6,9 @@ This is an **unofficial fork** of [CyberCAT-SimpleGUI by Deweh (DeweySalt)](http
 
 ## ⬇️ Download (no coding needed)
 
-1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29b-win-x64.zip** under **Assets**.
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29c-win-x64.zip** under **Assets**.
 2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
-3. Open the extracted `CP2077SaveEditor-v0.29b` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+3. Open the extracted `CP2077SaveEditor-v0.29c` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
 4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
 
 Requires 64-bit Windows 10 or 11.
@@ -17,14 +17,19 @@ Requires 64-bit Windows 10 or 11.
 
 - **Back up your saves before using this.** Copy the whole save folder from `%USERPROFILE%\Saved Games\CD Projekt Red\Cyberpunk 2077\` to somewhere safe.
 - **This update has had very little in-game testing.** Only one patch 2.5 save has been loaded in the game after editing, with edits to stats and attributes (numbers) and appearance.
-- **Everything else has been tested by code only, not in the game.** That covers inventory, vehicles, quest facts, the extras tab, saves from patches 2.0 to 2.31, and modded saves. Automated tests on real saves from patches 2.0, 2.01, 2.31 and 2.5 load each save, edit it, write it and read it back without losing data. That makes a working save likely, but it doesn't prove the game will accept it.
+- **Everything else has been tested by code only, not in the game.** That covers inventory, vehicles, quest facts, the extras tab, changing body gender, saves from patches 2.0 to 2.31, and modded saves. Automated tests on real saves from patches 2.0, 2.01, 2.31 and 2.5 load each save, edit it, write it and read it back without losing data. That makes a working save likely, but it doesn't prove the game will accept it.
 - Save into a **new save slot** rather than over your only copy. When you overwrite a `sav.dat`, the editor keeps the previous file as `sav.old`.
 - Editing quest facts and inventory flags can break quests or items in ways that only show up hours later. Keep your backup for a while.
 - Please report problems with the `error.txt` the editor creates next to the exe, the game version, and what you changed.
 
-## What's new in v0.29a
+## What's new in v0.29c
 
 [RELEASE_NOTES.md](RELEASE_NOTES.md) has the full release post.
+
+- **Changing body gender works again.** It used to leave a mix of both body types with the old head, and the game could crash at the mirror. The new body now gets a complete appearance made for patch 2.5, and a change that can't be made leaves the save untouched.
+- **Saves with script mods:** the player and NPC data that some mods add fields to is now read and kept. Previously the editor skipped that data, so body gender couldn't be changed on those saves.
+
+## What's new in v0.29a
 
 - **Patch 2.5 support.** Patch 2.5 saves load and save, including stat editing. Patch 2.5 changed the format the game uses to store stats.
 - **Mod data is kept.** Older versions silently deleted stat and perk values they didn't recognise (for example values added by mods) when saving, and that affected patch 2.x saves too. These values are now kept and written back unchanged.
@@ -88,7 +93,7 @@ Releases are currently **unsigned**, so Windows SmartScreen may warn when you fi
 - **[CyberCAT](https://github.com/WolvenKit/CyberCAT)** by SirBitesalot and contributors. It's the project the original editor came from.
 - **[WolvenKit](https://github.com/WolvenKit/WolvenKit)** by the WolvenKit team. It reads and writes the save files, and this fork adds a few patch 2.5 fixes to it (see [NOTICE.md](NOTICE.md)).
 - **[K4os.Compression.LZ4](https://github.com/MiloszKrajewski/K4os.Compression.LZ4)** by Milosz Krajewski.
-- **Patch 2.5 update (v0.29a):** written about 95% by **Claude** (Anthropic's AI model, using Claude Code), and about 5% by **topagae**, who directed and tested it.
+- **Patch 2.5 update (v0.29a and later):** written about 95% by **Claude** (Anthropic's AI model, using Claude Code), and about 5% by **topagae**, who directed and tested it.
 
 ## License
 

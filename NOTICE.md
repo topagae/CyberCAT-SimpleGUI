@@ -5,7 +5,7 @@
 - **CyberCAT-SimpleGUI** was created by **Deweh (DeweySalt)**, with contributions from seberoth, Merijn Hendriks, Alain Dupuis and others (see the git history). Original repository: https://github.com/Deweh/CyberCAT-SimpleGUI
 - It started as a simplified offshoot of **CyberCAT** by **SirBitesalot** and contributors: https://github.com/WolvenKit/CyberCAT
 - Save parsing is done by **WolvenKit** by the **WolvenKit team**: https://github.com/WolvenKit/WolvenKit
-- The **v0.29a patch 2.5 update** was written about 95% by **Claude** (Anthropic's AI model, via Claude Code) and about 5% by **topagae**, who directed the work and tested it in game. It is an unofficial fork and is not endorsed by the original authors.
+- The **patch 2.5 update (v0.29a and later)** was written about 95% by **Claude** (Anthropic's AI model, via Claude Code) and about 5% by **topagae**, who directed the work and tested it in game. It is an unofficial fork and is not endorsed by the original authors.
 
 ## Licenses
 
@@ -17,6 +17,19 @@
 | WolvenKit | GPL-3.0 | [licenses/WolvenKit.LICENSE.txt](licenses/WolvenKit.LICENSE.txt) |
 
 The editor's own source code is MIT licensed. The released `CP2077SaveEditor.exe` is built together with WolvenKit, which is GPL-3.0, so the program as distributed is covered by the GPL-3.0. Anyone who redistributes the binaries must also make the full corresponding source available, including the modified WolvenKit files listed below.
+
+## Changes in v0.29c (2026-11)
+
+### Editor (`CP2077SaveEditor`)
+
+- `CP2077SaveEditor/Utils/AppearanceHelper2.cs`: changing body gender checks everything before it changes the save, so a failed change leaves it as it was. Previously the body gender was switched before the check for the player data, and a failed change left a body of one gender with the head and body parts of the other. The voice is kept, and the warning is only skipped for the one change it was suppressed for. Removed dead code.
+- `CP2077SaveEditor/Views/Controls/AppearanceControl.cs`: a preset for the other body gender is only loaded when the body gender change worked.
+- `CP2077SaveEditor/Resources/MaleDefault.preset`, `FemaleDefault.preset`: replaced with patch 2.5 presets taken from real saves. The old ones were from before patch 2.0 and lacked groups the game uses (for example `face`, `beards` and the newer arm cyberware). Eye, eyelash and eyebrow resources point at the base game files, all resources are in the base game archives.
+- `CP2077SaveEditor/CP2077SaveEditor.csproj`: changed files in `Resources\` are embedded again by incremental builds. New version number.
+
+### WolvenKit (`patches/WolvenKit.patch`)
+
+- `WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs`: fields that script mods add to game classes (redscript `@addField`), including ones holding classes defined by the mod, are kept and written back unchanged, in their original place. Previously an entry with such a field wasn't parsed at all, which for the player's entry made body gender changes impossible.
 
 ## Changes in v0.29b (2026-11)
 

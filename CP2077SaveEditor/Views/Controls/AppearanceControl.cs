@@ -185,6 +185,12 @@ public partial class AppearanceControl : UserControl, IGameControl
             {
                 _parentForm.ActiveSaveFile.Appearance.SuppressBodyGenderPrompt = true;
                 _parentForm.ActiveSaveFile.Appearance.BodyGender = newValues.Preset.IsMale ? AppearanceGender.Male : AppearanceGender.Female;
+
+                // A preset for the other body gender only fits once the body gender has changed
+                if ((bool)newValues.Preset.IsMale != (bool)_parentForm.ActiveSaveFile.GetAppearanceContainer().Preset.IsMale)
+                {
+                    return;
+                }
             }
             _parentForm.ActiveSaveFile.SetAppearanceContainer(newValues);
             RefreshAppearanceValues();

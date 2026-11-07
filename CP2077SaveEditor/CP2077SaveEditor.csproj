@@ -8,8 +8,8 @@
     <Platforms>x64</Platforms>
 
     <!-- The editor shows InformationalVersion in its title and status bar -->
-    <Version>0.29.1</Version>
-    <InformationalVersion>0.29b</InformationalVersion>
+    <Version>0.29.2</Version>
+    <InformationalVersion>0.29c</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>CyberCAT-SimpleGUI</Product>
     <Description>Cyberpunk 2077 save editor, patch 2.5 update (unofficial fork of CyberCAT-SimpleGUI by Deweh)</Description>
@@ -60,5 +60,13 @@
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
+
+  <!--
+    Incremental builds don't notice changes to the files Resources.resx links to (Resources\*), and kept embedding
+    the old ones. Deleting the compiled resources when one of them is newer makes them build again.
+  -->
+  <Target Name="RebuildChangedLinkedResources" BeforeTargets="CoreResGen" Inputs="@(Resource)" Outputs="$(IntermediateOutputPath)$(RootNamespace).Properties.Resources.resources">
+    <Delete Files="$(IntermediateOutputPath)$(RootNamespace).Properties.Resources.resources" />
+  </Target>
 
 </Project>

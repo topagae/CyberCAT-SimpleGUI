@@ -1,4 +1,4 @@
-# CyberCAT-SimpleGUI v0.29b: save editor updated for Cyberpunk 2077 patch 2.5
+# CyberCAT-SimpleGUI v0.29c: save editor updated for Cyberpunk 2077 patch 2.5
 
 The CyberCAT-SimpleGUI save editor works again. This is an unofficial fork of Deweh's [CyberCAT-SimpleGUI](https://github.com/Deweh/CyberCAT-SimpleGUI), which stopped working with patch 2.5 saves.
 
@@ -6,9 +6,9 @@ The full source is at https://github.com/topagae/CyberCAT-SimpleGUI.
 
 ## ⬇️ Download (no coding needed)
 
-1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29b-win-x64.zip** under **Assets**.
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29c-win-x64.zip** under **Assets**.
 2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
-3. Open the extracted `CP2077SaveEditor-v0.29b` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+3. Open the extracted `CP2077SaveEditor-v0.29c` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
 4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
 
 Requires 64-bit Windows 10 or 11.
@@ -17,9 +17,19 @@ Requires 64-bit Windows 10 or 11.
 
 - **Back up your saves.** Copy your save folder from `%USERPROFILE%\Saved Games\CD Projekt Red\Cyberpunk 2077\` somewhere safe before you edit anything.
 - **It has had very little in-game testing.** One patch 2.5 save was edited (stats, attributes and appearance) and loaded fine in the game.
-- **Everything else is tested by code only.** That covers inventory, vehicles, quest facts, extras, patch 2.0–2.31 saves and modded saves. Automated tests on real saves (2.0, 2.01, 2.31, 2.5) load, edit, save and reload them without losing data, but that doesn't guarantee the game accepts every edit.
+- **Everything else is tested by code only.** That covers inventory, vehicles, quest facts, extras, body gender changes, patch 2.0–2.31 saves and modded saves. Automated tests on real saves (2.0, 2.01, 2.31, 2.5) load, edit, save and reload them without losing data, but that doesn't guarantee the game accepts every edit.
 - Save into a new slot, not over your only copy.
 - Editing quest facts and item flags can break things hours later. Keep your backup for a while.
+
+## What's new in v0.29c
+
+- **Changing body gender is fixed.** It used to leave V with a mix of both body types and the old gender's head, and the game could crash when you used a mirror. Now:
+  - the new body gets a complete default appearance made for patch 2.5 (the old defaults were from before patch 2.0);
+  - every part of that appearance comes from the base game, so it doesn't need any mods;
+  - if the change can't be made, the save is left exactly as it was;
+  - V's voice stays the same.
+- **Better support for script mods.** Some mods (for example BetterNetrunning, StealthRunner and MuchBetterContracts) store their own data on V and on NPCs. The editor used to skip that data entirely, so on those saves body gender couldn't be changed. That data is now read, and written back exactly as it was.
+- **Loading an appearance preset for the other body gender** now only applies it if the body gender change worked.
 
 ## What's new in v0.29b
 
