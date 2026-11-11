@@ -348,3 +348,6 @@ error.txt
 
 # Release publish profile (no credentials in it)
 !CP2077SaveEditor/Properties/PublishProfiles/win-x64.pubxml
+
+# Nexus Mods personal API key (local copy, the workflow uses the NEXUS_API_KEY secret)
+.nexus-api-key
