@@ -7,9 +7,14 @@
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
 
-    <!-- The editor shows InformationalVersion in its title and status bar -->
-    <Version>0.29.2</Version>
-    <InformationalVersion>0.29c</InformationalVersion>
+    <!--
+      DisplayVersion is what users see: title bar, status bar, credits and the release folder name.
+      InformationalVersion must stay valid SemVer. WolvenKit parses it strictly when it reads or writes
+      appearance presets, and a version like "0.29c" made that throw. Bump both when releasing.
+    -->
+    <DisplayVersion>0.29d</DisplayVersion>
+    <Version>0.29.3</Version>
+    <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>CyberCAT-SimpleGUI</Product>
     <Description>Cyberpunk 2077 save editor, patch 2.5 update (unofficial fork of CyberCAT-SimpleGUI by Deweh)</Description>
@@ -18,6 +23,11 @@
     <!-- Only ship English resources of the framework -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <!-- Read at runtime by AppInfo.DisplayVersion -->
+  <ItemGroup>
+    <AssemblyMetadata Include="DisplayVersion" Value="$(DisplayVersion)" />
+  </ItemGroup>
 
   <!-- Docs and licenses for release builds, see Properties\PublishProfiles\win-x64.pubxml -->
   <ItemGroup>

@@ -18,6 +18,18 @@
 
 The editor's own source code is MIT licensed. The released `CP2077SaveEditor.exe` is built together with WolvenKit, which is GPL-3.0, so the program as distributed is covered by the GPL-3.0. Anyone who redistributes the binaries must also make the full corresponding source available, including the modified WolvenKit files listed below.
 
+## Changes in v0.29d (2026-11)
+
+### Editor (`CP2077SaveEditor`)
+
+- `CP2077SaveEditor/CP2077SaveEditor.csproj`: new `DisplayVersion` property for the version users see. `InformationalVersion` is now the numeric `Version`, because WolvenKit parses it as strict SemVer whenever it reads or writes JSON (presets, body gender changes), and `0.29c` made that throw. New version number.
+- `CP2077SaveEditor/Utils/AppInfo.cs` (new), `CP2077SaveEditor/Views/Form2.cs`, `CP2077SaveEditor/Properties/PublishProfiles/win-x64.pubxml`: the title bar, status bar, credits dialog and release folder use `DisplayVersion`.
+- `CP2077SaveEditor/Views/Controls/PlayerStatsControl.cs`: lifepath values other than Corporate, Nomad and StreetKid (written by lifepath mods) show as "Modded" and are written back unchanged. Previously they threw on load, and the value 3 was rewritten as `Count`.
+- `CP2077SaveEditor/Views/Controls/ExtrasControl.cs`: unlocking all fast travel points adds the missing ones, instead of clearing the list and re-adding the ones in `FastTravel.json`.
+- `CP2077SaveEditor/Views/Form2.cs`: Ctrl+S and Ctrl+O shortcuts. The error shown for a `DllNotFoundException` explains that `kraken.dll` is needed and how it usually goes missing.
+- `CP2077SaveEditor/Views/Controls/QuestFactsControl.cs`: the romance button's message says that some romances also need a mod.
+- `README.md`: how the two version properties work.
+
 ## Changes in v0.29c (2026-11)
 
 ### Editor (`CP2077SaveEditor`)

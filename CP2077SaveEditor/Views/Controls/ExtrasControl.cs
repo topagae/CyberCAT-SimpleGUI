@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows.Forms;
 using CP2077SaveEditor.ModSupport;
@@ -43,9 +44,24 @@ public partial class ExtrasControl : UserControl, IGameControl
         var fts = _parentForm.ActiveSaveFile.GetScriptableSystem<FastTravelSystem>();
         if (fts != null)
         {
-            fts.FastTravelNodes.Clear();
+            // Only add missing points. Clearing the list first dropped unlocked points that FastTravel.json
+            // doesn't know about, like Dogtown ones or points added by mods.
+            var known = new HashSet<ulong>();
+            foreach (var node in fts.FastTravelNodes)
+            {
+                if (node.Chunk is { } point)
+                {
+                    known.Add(point.PointRecord);
+                }
+            }
+
             foreach (var record in ResourceHelper.FastTravelRecords)
             {
+                if (!known.Add((TweakDBID)record.PointRecord))
+                {
+                    continue;
+                }
+
                 fts.FastTravelNodes.Add(new gameFastTravelPointData
                 {
                     MarkerRef = record.MarkerRef,

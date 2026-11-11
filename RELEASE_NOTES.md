@@ -1,4 +1,4 @@
-# CyberCAT-SimpleGUI v0.29c: save editor updated for Cyberpunk 2077 patch 2.5
+# CyberCAT-SimpleGUI v0.29d: save editor updated for Cyberpunk 2077 patch 2.5
 
 The CyberCAT-SimpleGUI save editor works again. This is an unofficial fork of Deweh's [CyberCAT-SimpleGUI](https://github.com/Deweh/CyberCAT-SimpleGUI), which stopped working with patch 2.5 saves.
 
@@ -6,9 +6,9 @@ The full source is at https://github.com/topagae/CyberCAT-SimpleGUI.
 
 ## ⬇️ Download (no coding needed)
 
-1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29c-win-x64.zip** under **Assets**.
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29d-win-x64.zip** under **Assets**.
 2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
-3. Open the extracted `CP2077SaveEditor-v0.29c` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+3. Open the extracted `CP2077SaveEditor-v0.29d` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
 4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
 
 Requires 64-bit Windows 10 or 11.
@@ -20,6 +20,15 @@ Requires 64-bit Windows 10 or 11.
 - **Everything else is tested by code only.** That covers inventory, vehicles, quest facts, extras, body gender changes, patch 2.0–2.31 saves and modded saves. Automated tests on real saves (2.0, 2.01, 2.31, 2.5) load, edit, save and reload them without losing data, but that doesn't guarantee the game accepts every edit.
 - Save into a new slot, not over your only copy.
 - Editing quest facts and item flags can break things hours later. Keep your backup for a while.
+
+## What's new in v0.29d
+
+- **Appearance presets and body gender changes work again.** In v0.29a to v0.29c, loading or saving a preset, or changing body gender, failed with "Minor version contains invalid character". That was caused by the editor's version number, not by your save.
+- **Saves using lifepath mods load.** Saves from mods like Fresh Start, which combine lifepaths, failed with "Specified argument was out of the range of valid values". They now load, the lifepath shows as "Modded", and it's kept as it is.
+- **"Unlock all fast travel points" keeps the ones you have.** It used to replace the whole list, which could remove unlocked points the editor didn't know about, like Dogtown ones or points added by mods. Now it only adds the missing ones.
+- **Ctrl+S saves and Ctrl+O opens a save**, which helps when the buttons don't show, for example under Wine or Proton.
+- **A clearer message when `kraken.dll` can't be loaded.** That file decompresses saves. It's usually missing because the zip wasn't fully extracted, or because antivirus quarantined it.
+- **The "Make all characters romanceable" button explains its limit.** Some romances outside the game's rules, like Panam with a female V, also need a romance mod.
 
 ## What's new in v0.29c
 

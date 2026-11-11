@@ -31,8 +31,8 @@ public partial class Form2 : Form, INotifyPropertyChanged
     {
         InitializeComponent();
 
-        Text = $"Cyberpunk 2077 Save Editor v{Application.ProductVersion} for Patch 2.5 (unofficial fork of CyberCAT-SimpleGUI)";
-        tssl_Info.Text = $"v{Application.ProductVersion} (Patch 2.5) - fork of CyberCAT-SimpleGUI by Deweh - click for credits";
+        Text = $"Cyberpunk 2077 Save Editor v{AppInfo.DisplayVersion} for Patch 2.5 (unofficial fork of CyberCAT-SimpleGUI)";
+        tssl_Info.Text = $"v{AppInfo.DisplayVersion} (Patch 2.5) - fork of CyberCAT-SimpleGUI by Deweh - click for credits";
 
         CompressionSettings.Get().UseOodle = false;
 
@@ -207,6 +207,13 @@ public partial class Form2 : Form, INotifyPropertyChanged
 
     private static void ShowError(string message, Exception e)
     {
+        // kraken.dll decompresses saves. When it's missing, it was usually not extracted or was quarantined by antivirus.
+        if (e is DllNotFoundException)
+        {
+            message += $"{Environment.NewLine}A library the editor needs (kraken.dll) could not be loaded. Extract the whole zip into a folder, " +
+                       "check that kraken.dll is next to CP2077SaveEditor.exe, and check whether your antivirus quarantined it";
+        }
+
         try
         {
             File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "error.txt"), e.ToString());
@@ -236,6 +243,24 @@ public partial class Form2 : Form, INotifyPropertyChanged
         field = value;
         OnPropertyChanged(propertyName);
         return true;
+    }
+
+    // Ctrl+S / Ctrl+O, also for setups where the buttons don't show (e.g. Wine/Proton)
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == (Keys.Control | Keys.S) && saveChangesButton.Enabled)
+        {
+            saveChangesButton_Click(saveChangesButton, EventArgs.Empty);
+            return true;
+        }
+
+        if (keyData == (Keys.Control | Keys.O) && openSaveButton.Enabled)
+        {
+            openSaveButton_Click(openSaveButton, EventArgs.Empty);
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 
     private async void saveChangesButton_Click(object sender, EventArgs e)
@@ -340,7 +365,7 @@ public partial class Form2 : Form, INotifyPropertyChanged
     {
         MessageBox.Show(
             $"""
-            CyberCAT-SimpleGUI v{Application.ProductVersion} - Patch 2.5 update
+            CyberCAT-SimpleGUI v{AppInfo.DisplayVersion} - Patch 2.5 update
 
             Original editor: CyberCAT-SimpleGUI by Deweh (DeweySalt) and contributors
             https://github.com/Deweh/CyberCAT-SimpleGUI
