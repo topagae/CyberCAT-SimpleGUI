@@ -2,6 +2,11 @@
 #
 # Code signing through SignPath Foundation is switched on by setting the repository variable SIGNPATH_ORGANIZATION_ID
 # and the secret SIGNPATH_API_TOKEN (Settings > Secrets and variables > Actions). Without them the release is unsigned.
+#
+# Uploading to Nexus Mods is switched on by setting the repository variables NEXUS_MOD_ID and NEXUS_FILE_ID and the
+# secret NEXUS_API_KEY (https://www.nexusmods.com/settings/api-keys). Tag builds then add the zip as a new version of
+# that file, with the "What's new" section of RELEASE_NOTES.md as the changelog. Both IDs are shown on the mod page's
+# Files tab with "Advanced" checked.
 name: Build release
 
 on:
@@ -103,3 +108,37 @@ jobs:
             Set-Content notes.md ((Get-Content RELEASE_NOTES.md -Raw) + $checksum)
             gh release create $tag $zip --title "$tag" --notes-file notes.md
           }
+
+      # Nexus changelogs are plain text, so the markdown is simplified
+      - name: Prepare Nexus Mods changelog
+        id: nexus
+        if: startsWith(github.ref, 'refs/tags/') && vars.NEXUS_FILE_ID != ''
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $notes = Get-Content RELEASE_NOTES.md -Raw
+          $pattern = '(?ms)^## What''s new in ' + [regex]::Escape($tag) + '\s*$(.*?)(?=^## |\z)'
+          $match = [regex]::Match($notes, $pattern)
+          if (-not $match.Success) { throw "RELEASE_NOTES.md has no ""What's new in $tag"" section" }
+          $changelog = $match.Groups[1].Value.Trim()
+          $changelog = [regex]::Replace($changelog, '\[([^\]]+)\]\([^)]+\)', '$1')
+          $changelog = $changelog -replace '\*\*', '' -replace '`', ''
+          $delimiter = "EOF_$([guid]::NewGuid().ToString('N'))"
+          "version=$($tag.TrimStart('v'))" >> $env:GITHUB_OUTPUT
+          "changelog<<$delimiter`n$changelog`n$delimiter" >> $env:GITHUB_OUTPUT
+
+      # v1.0.0-beta.11, pinned to its commit
+      - name: Upload to Nexus Mods
+        if: steps.nexus.outcome == 'success'
+        uses: Nexus-Mods/upload-action@98532f7670c27cbecc78fae03fa3e278147827e2
+        with:
+          api_key: ${{ secrets.NEXUS_API_KEY }}
+          mod_id: ${{ vars.NEXUS_MOD_ID }}
+          file_id: ${{ vars.NEXUS_FILE_ID }}
+          filename: ${{ steps.zip.outputs.zip }}
+          version: ${{ steps.nexus.outputs.version }}
+          display_name: CP2077SaveEditor V${{ steps.nexus.outputs.version }} Win X64
+          description: Save editor for Cyberpunk 2077 patch 2.5. Unofficial fork of CyberCAT-SimpleGUI. Back up your saves first.
+          changelog: ${{ steps.nexus.outputs.changelog }}
+          archive_existing_version: true
+          update_mod_version: true
