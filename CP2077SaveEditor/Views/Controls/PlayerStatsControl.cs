@@ -9,337 +9,351 @@ using WolvenKit.RED4.Archive.Buffer;
 using WolvenKit.RED4.Types;
 using static WolvenKit.RED4.Types.Enums;
 
-namespace CP2077SaveEditor.Views.Controls;
-
-public partial class PlayerStatsControl : UserControl, IGameControl
+namespace CP2077SaveEditor.Views.Controls
 {
-    private readonly Form2 _parentForm;
-
-    private readonly Dictionary<Enum, NumericUpDown> _attributeFields, _proficiencyFields, _devPointFields;
-    private readonly Dictionary<gamedataProficiencyType, gamedataStatType> _proficiencyToStatMap;
-    private CEnum<gamedataLifePath>? _originalLifePath;
-
-    public PlayerStatsControl(Form2 parentForm)
+    public partial class PlayerStatsControl : UserControl, IGameControl
     {
-        InitializeComponent();
+        private readonly MainForm _parentForm;
 
-        _parentForm = parentForm;
-        _parentForm.PropertyChanged += OnParentFormPropertyChanged;
+        private readonly Dictionary<Enum, NumericUpDown> _attributeFields, _proficiencyFields, _devPointFields;
+        private readonly Dictionary<gamedataProficiencyType, gamedataStatType> _proficiencyToStatMap;
+        private bool _isLoading;
+        private CEnum<gamedataLifePath>? _originalLifePath;
 
-        //BackgroundImage = Properties.Resources.player_stats;
-
-        _attributeFields = new Dictionary<Enum, NumericUpDown>
+        public PlayerStatsControl(MainForm parentForm)
         {
-            {gamedataStatType.Strength, bodyUpDown},
-            {gamedataStatType.Reflexes, reflexesUpDown},
-            {gamedataStatType.TechnicalAbility, technicalAbilityUpDown},
-            {gamedataStatType.Intelligence, intelligenceUpDown},
-            {gamedataStatType.Cool, coolUpDown}
-        };
+            InitializeComponent();
 
-        _proficiencyFields = new Dictionary<Enum, NumericUpDown> {
-            {gamedataProficiencyType.Level, levelUpDown},
-            {gamedataProficiencyType.StreetCred, streetCredUpDown},
-            {gamedataProficiencyType.CoolSkill, assassineUpDown},
-            {gamedataProficiencyType.IntelligenceSkill, netrunnerUpDown},
-            {gamedataProficiencyType.ReflexesSkill, shinobiUpDown},
-            {gamedataProficiencyType.StrengthSkill, soloUpDown},
-            {gamedataProficiencyType.TechnicalAbilitySkill, techieUpDown}
-        };
+            _parentForm = parentForm;
+            _parentForm.PropertyChanged += OnParentFormPropertyChanged;
 
-        _proficiencyToStatMap = new Dictionary<gamedataProficiencyType, gamedataStatType>
-        {
-            {gamedataProficiencyType.Level, gamedataStatType.Level},
-            {gamedataProficiencyType.StreetCred, gamedataStatType.StreetCred},
-            {gamedataProficiencyType.CoolSkill, gamedataStatType.CoolSkill},
-            {gamedataProficiencyType.IntelligenceSkill, gamedataStatType.IntelligenceSkill},
-            {gamedataProficiencyType.ReflexesSkill, gamedataStatType.ReflexesSkill},
-            {gamedataProficiencyType.StrengthSkill, gamedataStatType.StrengthSkill},
-            {gamedataProficiencyType.TechnicalAbilitySkill, gamedataStatType.TechnicalAbilitySkill},
-        };
+            //BackgroundImage = Properties.Resources.player_stats;
 
-        _devPointFields = new Dictionary<Enum, NumericUpDown>
-        {
-            {gamedataDevelopmentPointType.Attribute, attrPointsUpDown},
-            {gamedataDevelopmentPointType.Primary, perkPointsUpDown},
-            {gamedataDevelopmentPointType.Espionage, relicUpDown},
-        };
-
-        foreach (var numUpDown in _attributeFields.Values)
-        {
-            numUpDown.ValueChanged += PlayerStatChanged;
-        }
-
-        foreach (var numUpDown in _proficiencyFields.Values)
-        {
-            numUpDown.ValueChanged += PlayerStatChanged;
-        }
-
-        foreach (var numUpDown in _devPointFields.Values)
-        {
-            numUpDown.ValueChanged += PlayerStatChanged;
-        }
-    }
-
-    public string GameControlName => "Player Stats";
-
-    private void OnParentFormPropertyChanged(object sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(_parentForm.ActiveSaveFile))
-        {
-            if (_parentForm.ActiveSaveFile != null)
+            _attributeFields = new Dictionary<Enum, NumericUpDown>
             {
-                this.InvokeIfRequired(Init);
+                {gamedataStatType.Strength, bodyUpDown},
+                {gamedataStatType.Reflexes, reflexesUpDown},
+                {gamedataStatType.TechnicalAbility, technicalAbilityUpDown},
+                {gamedataStatType.Intelligence, intelligenceUpDown},
+                {gamedataStatType.Cool, coolUpDown}
+            };
+
+            _proficiencyFields = new Dictionary<Enum, NumericUpDown> {
+                {gamedataProficiencyType.Level, levelUpDown},
+                {gamedataProficiencyType.StreetCred, streetCredUpDown},
+                {gamedataProficiencyType.CoolSkill, assassineUpDown},
+                {gamedataProficiencyType.IntelligenceSkill, netrunnerUpDown},
+                {gamedataProficiencyType.ReflexesSkill, shinobiUpDown},
+                {gamedataProficiencyType.StrengthSkill, soloUpDown},
+                {gamedataProficiencyType.TechnicalAbilitySkill, techieUpDown}
+            };
+
+            _proficiencyToStatMap = new Dictionary<gamedataProficiencyType, gamedataStatType>
+            {
+                {gamedataProficiencyType.Level, gamedataStatType.Level},
+                {gamedataProficiencyType.StreetCred, gamedataStatType.StreetCred},
+                {gamedataProficiencyType.CoolSkill, gamedataStatType.CoolSkill},
+                {gamedataProficiencyType.IntelligenceSkill, gamedataStatType.IntelligenceSkill},
+                {gamedataProficiencyType.ReflexesSkill, gamedataStatType.ReflexesSkill},
+                {gamedataProficiencyType.StrengthSkill, gamedataStatType.StrengthSkill},
+                {gamedataProficiencyType.TechnicalAbilitySkill, gamedataStatType.TechnicalAbilitySkill},
+            };
+
+            _devPointFields = new Dictionary<Enum, NumericUpDown>
+            {
+                {gamedataDevelopmentPointType.Attribute, attrPointsUpDown},
+                {gamedataDevelopmentPointType.Primary, perkPointsUpDown},
+                {gamedataDevelopmentPointType.Espionage, relicUpDown},
+            };
+
+            foreach (var numUpDown in _attributeFields.Values)
+            {
+                numUpDown.ValueChanged += PlayerStatChanged;
+            }
+
+            foreach (var numUpDown in _proficiencyFields.Values)
+            {
+                numUpDown.ValueChanged += PlayerStatChanged;
+            }
+
+            foreach (var numUpDown in _devPointFields.Values)
+            {
+                numUpDown.ValueChanged += PlayerStatChanged;
             }
         }
-    }
 
-    private void Init()
-    {
-        var playerData = _parentForm.ActiveSaveFile.GetPlayerDevelopmentData();
+        public string GameControlName => "Player Stats";
+        public string Icon => "";
 
-        // Lifepath mods (like Fresh Start) can store values besides the three vanilla ones. Those show as
-        // "Modded" and are written back unchanged, instead of throwing or being replaced.
-        _originalLifePath = playerData.LifePath;
-
-        lifePathBox.Items.Clear();
-        lifePathBox.Items.Add("Corporate");
-        lifePathBox.Items.Add("Nomad");
-        lifePathBox.Items.Add("StreetKid");
-
-        var vanillaIndex = (gamedataLifePath)playerData.LifePath switch
+        private void OnParentFormPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            gamedataLifePath.Corporate => 0,
-            gamedataLifePath.Nomad => 1,
-            gamedataLifePath.StreetKid => 2,
-            _ => -1
-        };
-
-        if (vanillaIndex >= 0)
-        {
-            lifePathBox.SelectedIndex = vanillaIndex;
-        }
-        else
-        {
-            lifePathBox.Items.Add("Modded");
-            lifePathBox.SelectedIndex = 3;
-        }
-        
-        foreach (var proficiency in playerData.Proficiencies)
-        {
-            if (_proficiencyFields.TryGetValue(proficiency.Type, out var numUpDown))
+            if (e.PropertyName == nameof(_parentForm.ActiveSaveFile))
             {
-                if (proficiency.CurrentLevel > numUpDown.Maximum)
+                if (_parentForm.ActiveSaveFile != null)
                 {
-                    numUpDown.Maximum = proficiency.CurrentLevel;
+                    this.InvokeIfRequired(Init);
                 }
-
-                numUpDown.Value = proficiency.CurrentLevel;
             }
         }
 
-        foreach (var attribute in playerData.Attributes)
+        private void Init()
         {
-            if (_attributeFields.TryGetValue(attribute.AttributeName, out var numUpDown))
+            _isLoading = true;
+            try
             {
-                if (attribute.Value > numUpDown.Maximum)
+                var playerData = _parentForm.ActiveSaveFile.GetPlayerDevelopmentData();
+
+                // Lifepath mods (like Fresh Start) store values besides the three vanilla ones. Those show as
+                // "Modded" and are written back unchanged, instead of throwing or being replaced.
+                _originalLifePath = playerData.LifePath;
+
+                lifePathBox.Items.Clear();
+                lifePathBox.Items.Add("Corporate");
+                lifePathBox.Items.Add("Nomad");
+                lifePathBox.Items.Add("StreetKid");
+
+                var vanillaIndex = (gamedataLifePath)playerData.LifePath switch
                 {
-                    numUpDown.Maximum = attribute.Value;
+                    gamedataLifePath.Corporate => 0,
+                    gamedataLifePath.Nomad => 1,
+                    gamedataLifePath.StreetKid => 2,
+                    _ => -1
+                };
+
+                if (vanillaIndex >= 0)
+                {
+                    lifePathBox.SelectedIndex = vanillaIndex;
                 }
-
-                numUpDown.Value = attribute.Value;
-            }
-        }
-
-        foreach (var devPoint in playerData.DevPoints)
-        {
-            if (_devPointFields.TryGetValue(devPoint.Type, out var numUpDown))
-            {
-                numUpDown.SetValue(devPoint.Unspent);
-            }
-        }
-    }
-
-    private void PlayerStatChanged(object sender, EventArgs e)
-    {
-        if (!_parentForm.IsLoaded)
-        {
-            return;
-        }
-
-        var playerData = _parentForm.ActiveSaveFile.GetPlayerDevelopmentData();
-        var statsMap = GetPlayerStats();
-        if (statsMap == null)
-        {
-            return;
-        }
-
-        if (statsMap.ForcedModifiersBuffer?.Data is not ModifiersBuffer modifiersBuffer)
-        {
-            modifiersBuffer = new ModifiersBuffer();
-            statsMap.ForcedModifiersBuffer = new DataBuffer { Data = modifiersBuffer };
-        }
-
-        foreach (var proficiency in playerData.Proficiencies)
-        {
-            if (_proficiencyFields.TryGetValue(proficiency.Type, out var numUpDown))
-            {
-                proficiency.CurrentLevel = (CInt32)numUpDown.Value;
-                if (proficiency.CurrentLevel == 60)
+                else
                 {
-                    proficiency.CurrentExp = 0;
+                    lifePathBox.Items.Add("Modded");
+                    lifePathBox.SelectedIndex = 3;
                 }
-
-                var statType = _proficiencyToStatMap[proficiency.Type];
-                var stat = modifiersBuffer.Entries.FirstOrDefault(x => x.StatType == statType);
-                if (stat is not gameConstantStatModifierData_Deprecated constantStat)
+                
+                foreach (var proficiency in playerData.Proficiencies)
                 {
-                    constantStat = new gameConstantStatModifierData_Deprecated
+                    if (_proficiencyFields.TryGetValue(proficiency.Type, out var numUpDown))
                     {
-                        StatType = statType,
-                        ModifierType = gameStatModifierType.Additive,
-                        Value = 1
-                    };
-                    modifiersBuffer.Entries.Add(constantStat);
+                        if (proficiency.CurrentLevel > numUpDown.Maximum)
+                        {
+                            numUpDown.Maximum = proficiency.CurrentLevel;
+                        }
+
+                        numUpDown.Value = proficiency.CurrentLevel;
+                    }
                 }
 
-                constantStat.Value = (CFloat)(float)numUpDown.Value;
-            }
-        }
-
-        foreach (var attribute in playerData.Attributes)
-        {
-            if (_attributeFields.TryGetValue(attribute.AttributeName, out var numUpDown))
-            {
-                attribute.Value = (CInt32)numUpDown.Value;
-
-                var stat = modifiersBuffer.Entries.FirstOrDefault(x => x.StatType == (gamedataStatType)attribute.AttributeName);
-                if (stat is not gameConstantStatModifierData_Deprecated constantStat)
+                foreach (var attribute in playerData.Attributes)
                 {
-                    constantStat = new gameConstantStatModifierData_Deprecated
+                    if (_attributeFields.TryGetValue(attribute.AttributeName, out var numUpDown))
                     {
-                        StatType = attribute.AttributeName,
-                        ModifierType = gameStatModifierType.Additive,
-                        Value = 1
-                    };
-                    modifiersBuffer.Entries.Add(constantStat);
+                        if (attribute.Value > numUpDown.Maximum)
+                        {
+                            numUpDown.Maximum = attribute.Value;
+                        }
+
+                        numUpDown.Value = attribute.Value;
+                    }
                 }
 
-                constantStat.Value = (CFloat)(float)numUpDown.Value;
+                foreach (var devPoint in playerData.DevPoints)
+                {
+                    if (_devPointFields.TryGetValue(devPoint.Type, out var numUpDown))
+                    {
+                        numUpDown.SetValue(devPoint.Unspent);
+                    }
+                }
+            }
+            finally
+            {
+                _isLoading = false;
             }
         }
 
-        foreach (var devPoint in playerData.DevPoints)
+        private void PlayerStatChanged(object sender, EventArgs e)
         {
-            if (_devPointFields.TryGetValue(devPoint.Type, out var numUpDown))
+            if (!_parentForm.IsLoaded || _isLoading)
             {
-                devPoint.Unspent = (CInt32)numUpDown.Value;
+                return;
+            }
+
+            var playerData = _parentForm.ActiveSaveFile.GetPlayerDevelopmentData();
+            ChangeTracker.MarkChanged();
+            var statsMap = GetPlayerStats();
+            if (statsMap == null)
+            {
+                return;
+            }
+
+            if (statsMap.ForcedModifiersBuffer?.Data is not ModifiersBuffer modifiersBuffer)
+            {
+                modifiersBuffer = new ModifiersBuffer();
+                statsMap.ForcedModifiersBuffer = new DataBuffer { Data = modifiersBuffer };
+            }
+
+            foreach (var proficiency in playerData.Proficiencies)
+            {
+                if (_proficiencyFields.TryGetValue(proficiency.Type, out var numUpDown))
+                {
+                    proficiency.CurrentLevel = (CInt32)numUpDown.Value;
+                    if (proficiency.CurrentLevel == 60)
+                    {
+                        proficiency.CurrentExp = 0;
+                    }
+
+                    var statType = _proficiencyToStatMap[proficiency.Type];
+                    var stat = modifiersBuffer.Entries.FirstOrDefault(x => x.StatType == statType);
+                    if (stat is not gameConstantStatModifierData_Deprecated constantStat)
+                    {
+                        constantStat = new gameConstantStatModifierData_Deprecated
+                        {
+                            StatType = statType,
+                            ModifierType = gameStatModifierType.Additive,
+                            Value = 1
+                        };
+                        modifiersBuffer.Entries.Add(constantStat);
+                    }
+
+                    constantStat.Value = (CFloat)(float)numUpDown.Value;
+                }
+            }
+
+            foreach (var attribute in playerData.Attributes)
+            {
+                if (_attributeFields.TryGetValue(attribute.AttributeName, out var numUpDown))
+                {
+                    attribute.Value = (CInt32)numUpDown.Value;
+
+                    var stat = modifiersBuffer.Entries.FirstOrDefault(x => x.StatType == (gamedataStatType)attribute.AttributeName);
+                    if (stat is not gameConstantStatModifierData_Deprecated constantStat)
+                    {
+                        constantStat = new gameConstantStatModifierData_Deprecated
+                        {
+                            StatType = attribute.AttributeName,
+                            ModifierType = gameStatModifierType.Additive,
+                            Value = 1
+                        };
+                        modifiersBuffer.Entries.Add(constantStat);
+                    }
+
+                    constantStat.Value = (CFloat)(float)numUpDown.Value;
+                }
+            }
+
+            foreach (var devPoint in playerData.DevPoints)
+            {
+                if (_devPointFields.TryGetValue(devPoint.Type, out var numUpDown))
+                {
+                    devPoint.Unspent = (CInt32)numUpDown.Value;
+                }
             }
         }
-    }
 
-    private gameSavedStatsData GetPlayerStats()
-    {
-        if (!Global.StatsSystemEnabled)
+        private gameSavedStatsData GetPlayerStats()
         {
-            MessageBox.Show("Stats system disabled.");
-            return null;
-        }
-
-        var statsMap = _parentForm.ActiveSaveFile.GetStatsFromEntityId(1);
-        if (statsMap == null)
-        {
-            if (MessageBox.Show("Player stats not found. Creating it can cause issues. Do you wish to continue?", "Warning", MessageBoxButtons.YesNo) != DialogResult.Yes)
+            if (!Global.StatsSystemEnabled)
             {
+                MessageBox.Show("Stats system disabled.");
                 return null;
             }
 
-            statsMap = _parentForm.ActiveSaveFile.CreateStatDataFromEntityId(1);
-            statsMap.InactiveStats.Add(gamedataStatType.Level);
-
-            var defaultForcedModifiers = new[]
+            var statsMap = _parentForm.ActiveSaveFile.GetStatsFromEntityId(1);
+            if (statsMap == null)
             {
-                gamedataStatType.Assault,
-                gamedataStatType.Athletics,
-                gamedataStatType.Brawling,
-                gamedataStatType.ColdBlood,
-                gamedataStatType.CombatHacking,
-                gamedataStatType.CoolSkill,
-                gamedataStatType.Crafting,
-                gamedataStatType.Demolition,
-                gamedataStatType.Engineering,
-                gamedataStatType.Espionage,
-                gamedataStatType.Gunslinger,
-                gamedataStatType.Hacking,
-                gamedataStatType.IntelligenceSkill,
-                gamedataStatType.Kenjutsu,
-                gamedataStatType.ReflexesSkill,
-                gamedataStatType.Stealth,
-                gamedataStatType.StreetCred,
-                gamedataStatType.StrengthSkill,
-                gamedataStatType.TechnicalAbilitySkill,
-                gamedataStatType.Cool,
-                gamedataStatType.Intelligence,
-                gamedataStatType.Reflexes,
-                gamedataStatType.Strength,
-                gamedataStatType.TechnicalAbility,
-                gamedataStatType.Level
-            };
-
-            var forcedModifierBuffer = new ModifiersBuffer();
-            foreach (var forcedModifier in defaultForcedModifiers)
-            {
-                forcedModifierBuffer.Entries.Add(new gameConstantStatModifierData_Deprecated
+                if (MessageBox.Show("Player stats not found. Creating it can cause issues. Do you wish to continue?", "Warning", MessageBoxButtons.YesNo) != DialogResult.Yes)
                 {
-                    StatType = forcedModifier,
-                    ModifierType = gameStatModifierType.Additive,
-                    Value = 1
-                });
+                    return null;
+                }
+
+                statsMap = _parentForm.ActiveSaveFile.CreateStatDataFromEntityId(1);
+                statsMap.InactiveStats.Add(gamedataStatType.Level);
+
+                var defaultForcedModifiers = new[]
+                {
+                    gamedataStatType.Assault,
+                    gamedataStatType.Athletics,
+                    gamedataStatType.Brawling,
+                    gamedataStatType.ColdBlood,
+                    gamedataStatType.CombatHacking,
+                    gamedataStatType.CoolSkill,
+                    gamedataStatType.Crafting,
+                    gamedataStatType.Demolition,
+                    gamedataStatType.Engineering,
+                    gamedataStatType.Espionage,
+                    gamedataStatType.Gunslinger,
+                    gamedataStatType.Hacking,
+                    gamedataStatType.IntelligenceSkill,
+                    gamedataStatType.Kenjutsu,
+                    gamedataStatType.ReflexesSkill,
+                    gamedataStatType.Stealth,
+                    gamedataStatType.StreetCred,
+                    gamedataStatType.StrengthSkill,
+                    gamedataStatType.TechnicalAbilitySkill,
+                    gamedataStatType.Cool,
+                    gamedataStatType.Intelligence,
+                    gamedataStatType.Reflexes,
+                    gamedataStatType.Strength,
+                    gamedataStatType.TechnicalAbility,
+                    gamedataStatType.Level
+                };
+
+                var forcedModifierBuffer = new ModifiersBuffer();
+                foreach (var forcedModifier in defaultForcedModifiers)
+                {
+                    forcedModifierBuffer.Entries.Add(new gameConstantStatModifierData_Deprecated
+                    {
+                        StatType = forcedModifier,
+                        ModifierType = gameStatModifierType.Additive,
+                        Value = 1
+                    });
+                }
+
+                statsMap.ForcedModifiersBuffer = new DataBuffer()
+                {
+                    Data = forcedModifierBuffer
+                };
+            }
+            
+            return statsMap;
+        }
+
+        private void additionalPlayerStatsButton_Click(object sender, EventArgs e)
+        {
+            var statsMap = GetPlayerStats();
+            if (statsMap == null)
+            {
+                return;
             }
 
-            statsMap.ForcedModifiersBuffer = new DataBuffer()
+            new StatsForm().Init("Player", statsMap);
+        }
+
+        private void lifePathBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (!_isLoading)
             {
-                Data = forcedModifierBuffer
-            };
-        }
-        
-        return statsMap;
-    }
+                ChangeTracker.MarkChanged();
+            }
 
-    private void additionalPlayerStatsButton_Click(object sender, EventArgs e)
-    {
-        var statsMap = GetPlayerStats();
-        if (statsMap == null)
-        {
-            return;
-        }
-
-        new StatsForm().Init("Player", statsMap);
-    }
-
-    private void lifePathBox_SelectedIndexChanged(object sender, EventArgs e)
-    {
-        switch (lifePathBox.SelectedIndex)
-        {
-            case 0:
-                lifePathPictureBox.Image = Properties.Resources.corpo;
-                _parentForm.ActiveSaveFile.GetPlayerDevelopmentData().LifePath = gamedataLifePath.Corporate;
-                break;
-            case 1:
-                lifePathPictureBox.Image = Properties.Resources.nomad;
-                _parentForm.ActiveSaveFile.GetPlayerDevelopmentData().LifePath = gamedataLifePath.Nomad;
-                break;
-            case 2:
-                lifePathPictureBox.Image = Properties.Resources.streetkid;
-                _parentForm.ActiveSaveFile.GetPlayerDevelopmentData().LifePath = gamedataLifePath.StreetKid;
-                break;
-            case 3:
-                lifePathPictureBox.Image = null;
-                if (_originalLifePath is { } originalLifePath)
-                {
-                    _parentForm.ActiveSaveFile.GetPlayerDevelopmentData().LifePath = originalLifePath;
-                }
-                break;
+            switch (lifePathBox.SelectedIndex)
+            {
+                case 0:
+                    lifePathPictureBox.Image = Properties.Resources.corpo;
+                    if (!_isLoading) _parentForm.ActiveSaveFile.GetPlayerDevelopmentData().LifePath = gamedataLifePath.Corporate;
+                    break;
+                case 1:
+                    lifePathPictureBox.Image = Properties.Resources.nomad;
+                    if (!_isLoading) _parentForm.ActiveSaveFile.GetPlayerDevelopmentData().LifePath = gamedataLifePath.Nomad;
+                    break;
+                case 2:
+                    lifePathPictureBox.Image = Properties.Resources.streetkid;
+                    if (!_isLoading) _parentForm.ActiveSaveFile.GetPlayerDevelopmentData().LifePath = gamedataLifePath.StreetKid;
+                    break;
+                case 3:
+                    lifePathPictureBox.Image = null;
+                    if (!_isLoading && _originalLifePath is { } originalLifePath) _parentForm.ActiveSaveFile.GetPlayerDevelopmentData().LifePath = originalLifePath;
+                    break;
+            }
         }
     }
 }

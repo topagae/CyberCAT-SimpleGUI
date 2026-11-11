@@ -1,5 +1,5 @@
 # Regenerates patches/WolvenKit.patch from the current changes in the WolvenKit submodule, including new files.
-# Run it after changing WolvenKit or after updating it to a new upstream version (see "Updating WolvenKit" in README.md).
+# Run it after changing WolvenKit or after updating it to a new upstream version (see "Changes to WolvenKit" in README.md).
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path $PSScriptRoot

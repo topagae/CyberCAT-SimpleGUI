@@ -1,27 +1,28 @@
 ﻿using System;
 using System.Windows.Forms;
 
-namespace CP2077SaveEditor;
-
-public partial class AddStat : Form
+namespace CP2077SaveEditor
 {
-    private Action<string> callbackFunc;
-
-    public AddStat()
+    public partial class AddStat : Form
     {
-        InitializeComponent();
-    }
+        private Action<string> callbackFunc;
 
-    private void addButton_Click(object sender, EventArgs e)
-    {
-        callbackFunc(modifierObjectBox.Text);
-        Close();
-    }
+        public AddStat()
+        {
+            InitializeComponent();
+        }
 
-    public void LoadAddDialog(Action<string> callback)
-    {
-        callbackFunc = callback;
-        modifierObjectBox.SelectedIndex = 0;
-        ShowDialog();
+        private void addButton_Click(object sender, EventArgs e)
+        {
+            callbackFunc(modifierObjectBox.Text);
+            Close();
+        }
+
+        public void LoadAddDialog(Action<string> callback)
+        {
+            callbackFunc = callback;
+            modifierObjectBox.SelectedIndex = 0;
+            ShowDialog();
+        }
     }
 }

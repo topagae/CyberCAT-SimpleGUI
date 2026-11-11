@@ -2,284 +2,398 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 using WolvenKit.RED4.Archive.Buffer;
 using WolvenKit.RED4.Archive.IO;
 using WolvenKit.RED4.Types;
 using static WolvenKit.RED4.Types.Enums;
 
-// Added in v0.29a (2026-10) for patch 2.5 support. Written by Claude (Anthropic) with topagae, see NOTICE.md.
-
-namespace CP2077SaveEditor.Utils;
-
-/// <summary>
-/// Patch 2.5 replaced the per entity stats (keys / values) with deduplicated tables (valuesOptimized + shared*).
-/// Entries are exposed as gameSavedStatsData so the editor can keep working with them. On save, only the entries
-/// that were changed are written back, as new slices. Shared slices are never modified in place.
-/// </summary>
-public class OptimizedStatsHelper
+namespace CP2077SaveEditor.Utils
 {
-    // Upper two bits of gameBufferSlice.combined are the buffer kind, the rest is the length
-    private const int KindShift = 30;
-    private const uint LengthMask = (1u << KindShift) - 1;
-    private const uint ModifiersKind = 0;
-    private const uint ForcedModifiersKind = 1;
-
-    private readonly gameStatsStateMapStructure _statsMap;
-    private readonly Dictionary<(ulong, gameStatIDType), gameSavedStatsDataOptimized> _entries = new();
-    private readonly Dictionary<gameSavedStatsDataOptimized, TrackedView> _views = new();
-
-    private class TrackedView
-    {
-        public gameSavedStatsData View { get; init; }
-
-        // null for new entries, so they are always written
-        public byte[] Fingerprint { get; set; }
-    }
-
-    public OptimizedStatsHelper(gameStatsStateMapStructure statsMap)
-    {
-        _statsMap = statsMap;
-
-        foreach (var entry in statsMap.ValuesOptimized)
-        {
-            _entries[(entry.EntityHash, entry.IdType)] = entry;
-        }
-    }
-
-    public static bool IsOptimized(gameStatsStateMapStructure statsMap) => statsMap.ValuesOptimized.Count > 0;
-
-    public bool ContainsSeed(uint seed) => _statsMap.ValuesOptimized.Any(x => x.Seed == seed);
-
-    public gameSavedStatsData Get(gameStatsObjectID id)
-    {
-        if (!_entries.TryGetValue((id.EntityHash, id.IdType), out var entry))
-        {
-            return null;
-        }
-
-        if (!_views.TryGetValue(entry, out var tracked))
-        {
-            var view = CreateView(entry);
-            tracked = new TrackedView { View = view, Fingerprint = GetFingerprint(view) };
-            _views.Add(entry, tracked);
-        }
-
-        return tracked.View;
-    }
-
-    public void Add(gameStatsObjectID id, gameSavedStatsData statsData)
-    {
-        var entry = new gameSavedStatsDataOptimized
-        {
-            EntityHash = id.EntityHash,
-            IdType = id.IdType,
-            Seed = statsData.Seed
-        };
-
-        statsData.ModifiersBuffer ??= new DataBuffer { Data = new ModifiersBuffer() };
-        statsData.ForcedModifiersBuffer ??= new DataBuffer { Data = new ModifiersBuffer() };
-
-        _statsMap.ValuesOptimized.Add(entry);
-        _entries[(id.EntityHash, id.IdType)] = entry;
-        _views[entry] = new TrackedView { View = statsData };
-    }
-
     /// <summary>
-    /// Writes all changed entries back into the optimized tables. Returns warnings about edits that couldn't be saved.
+    /// Since patch 2.5 the stats system stores <see cref="gameSavedStatsDataOptimized"/> entries instead of
+    /// <see cref="gameSavedStatsData"/>. Their record id and inactive stats are indices into shared tables, and their
+    /// modifiers live in slices of one shared binary buffer, deduplicated between entries.
+    ///
+    /// This exposes those entries as regular <see cref="gameSavedStatsData"/> objects (the format the rest of the
+    /// editor works with) and writes changes back in <see cref="Flush"/>. Slices can be shared, so a changed entry
+    /// gets a slice of its own instead of editing one in place.
     /// </summary>
-    public List<string> Commit()
+    public class OptimizedStatsHelper
     {
-        var warnings = new List<string>();
+        // gameBufferSlice.Combined: the low 30 bits are the slice size, the top 2 bits what it contains
+        private const uint SizeMask = 0x3FFFFFFF;
+        private const int KindShift = 30;
 
-        var data = _statsMap.SharedDataBuffer.Buffer.GetBytes();
-        var dataEnd = _statsMap.SharedBufferSlices.Select(x => (int)((uint)x.Offset + ((uint)x.Combined & LengthMask))).DefaultIfEmpty(0).Max();
-        var dataChanged = false;
+        // What a slice contains. Kind 1 holds what older saves stored as forced modifiers: for V these are the
+        // attribute and skill values (Strength, ..., Level), matching the forced modifiers of patch 2.x saves.
+        private const uint ModifiersKind = 0;
+        private const uint ForcedModifiersKind = 1;
+        private const uint ModifierGroupsKind = 2;
 
-        foreach (var (entry, tracked) in _views)
+        // Lets the UI know which stats came from here, without passing the save around
+        private static readonly ConditionalWeakTable<gameSavedStatsData, object> s_handedOut = new();
+
+        private readonly gameStatsStateMapStructure _map;
+
+        private readonly Dictionary<gameSavedStatsDataOptimized, gameSavedStatsData> _materialized = new(ReferenceEqualityComparer.Instance);
+        // Slice kinds per entry that couldn't be fully read. Those slices are kept as they are.
+        private readonly Dictionary<gameSavedStatsDataOptimized, HashSet<uint>> _unparsed = new(ReferenceEqualityComparer.Instance);
+        private Dictionary<(gameStatIDType, ulong), gameSavedStatsDataOptimized> _index;
+
+        public OptimizedStatsHelper(gameStatsStateMapStructure map)
         {
-            var view = tracked.View;
+            _map = map;
+        }
 
-            var fingerprint = GetFingerprint(view);
-            if (tracked.Fingerprint != null && fingerprint.AsSpan().SequenceEqual(tracked.Fingerprint))
+        public static bool IsOptimized(gameStatsStateMapStructure map) => map.ValuesOptimized.Count > 0;
+
+        /// <summary>
+        /// True for stats backed by the optimized format.
+        /// </summary>
+        public static bool IsOptimizedData(gameSavedStatsData data) => data != null && s_handedOut.TryGetValue(data, out _);
+
+        public bool ContainsSeed(uint seed) =>
+            _map.ValuesOptimized.Any(x => x.Seed == seed) || _materialized.Values.Any(x => x.Seed == seed);
+
+        public gameSavedStatsData Get(gameStatsObjectID id)
+        {
+            if (_index == null)
             {
-                continue;
-            }
-
-            if (view.SavedModifierGroupStatTypesBuffer?.Data is SavedModifierGroupStatTypesBuffer { Entries.Count: > 0 })
-            {
-                warnings.Add($"Modifier group changes for \"{view.RecordID.GetResolvedText() ?? view.RecordID.ToString()}\" can't be saved in this game version and were skipped.");
-            }
-
-            var sliceIndices = new CArray<CUInt16>();
-            AddSlice(Encode(view.ModifiersBuffer), ModifiersKind);
-            AddSlice(Encode(view.ForcedModifiersBuffer), ForcedModifiersKind);
-
-            // Keep slices of unknown kinds as they are
-            foreach (var index in entry.BufferSliceIndices)
-            {
-                if (GetKind(_statsMap.SharedBufferSlices[index]) is not (ModifiersKind or ForcedModifiersKind))
+                _index = new();
+                foreach (var entry in _map.ValuesOptimized)
                 {
-                    sliceIndices.Add(index);
+                    _index.TryAdd(((gameStatIDType)entry.IdType, (ulong)entry.EntityHash), entry);
                 }
             }
 
-            entry.BufferSliceIndices = sliceIndices;
-            entry.InactiveStatsIndices = new CArray<CUInt16>(view.InactiveStats.Select(x => (CUInt16)GetOrAdd(_statsMap.SharedInactiveStats, x)).ToList());
-            entry.RecordIDIndex = (ushort)GetOrAdd(_statsMap.SharedRecordId, view.RecordID);
-            entry.Seed = view.Seed;
-
-            tracked.Fingerprint = fingerprint;
-
-            void AddSlice(byte[] bytes, uint kind)
+            if (!_index.TryGetValue(((gameStatIDType)id.IdType, (ulong)id.EntityHash), out var optimized))
             {
-                if (bytes.Length == 0)
-                {
-                    return;
-                }
+                return null;
+            }
 
-                // Reuse an identical slice if there is one
-                for (var i = 0; i < _statsMap.SharedBufferSlices.Count; i++)
+            if (!_materialized.TryGetValue(optimized, out var data))
+            {
+                data = Materialize(optimized);
+                _materialized.Add(optimized, data);
+                s_handedOut.AddOrUpdate(data, null);
+            }
+
+            return data;
+        }
+
+        public void Add(gameStatsObjectID id, gameSavedStatsData data)
+        {
+            var optimized = new gameSavedStatsDataOptimized
+            {
+                IdType = id.IdType,
+                EntityHash = id.EntityHash
+            };
+
+            _map.ValuesOptimized.Add(optimized);
+            _index?.TryAdd(((gameStatIDType)id.IdType, (ulong)id.EntityHash), optimized);
+            _materialized.Add(optimized, data);
+            s_handedOut.AddOrUpdate(data, null);
+        }
+
+        private gameSavedStatsData Materialize(gameSavedStatsDataOptimized optimized)
+        {
+            var modifiers = new ModifiersBuffer();
+            var forcedModifiers = new ModifiersBuffer();
+            var groups = new SavedModifierGroupStatTypesBuffer();
+
+            var data = new gameSavedStatsData
+            {
+                RecordID = _map.SharedRecordId[(ushort)optimized.RecordIDIndex],
+                Seed = optimized.Seed,
+                // Same instance, so edits to it need no write back
+                StatModifiers = optimized.StatModifiers,
+                ModifiersBuffer = new DataBuffer { Data = modifiers },
+                ForcedModifiersBuffer = new DataBuffer { Data = forcedModifiers },
+                SavedModifierGroupStatTypesBuffer = new DataBuffer { Data = groups }
+            };
+
+            foreach (var index in optimized.InactiveStatsIndices)
+            {
+                data.InactiveStats.Add(_map.SharedInactiveStats[(ushort)index]);
+            }
+
+            foreach (var index in optimized.BufferSliceIndices)
+            {
+                var (kind, bytes) = GetSlice((ushort)index);
+                var buffer = RedBuffer.CreateBuffer(0, bytes);
+                bool parsedOk;
+
+                if (kind == ModifierGroupsKind)
                 {
-                    var slice = _statsMap.SharedBufferSlices[i];
-                    if (GetKind(slice) == kind && (slice.Combined & LengthMask) == bytes.Length &&
-                        data.AsSpan((int)(uint)slice.Offset, bytes.Length).SequenceEqual(bytes))
+                    using var reader = new SavedModifierGroupStatTypesBufferReader(new MemoryStream(bytes));
+                    reader.ReadBuffer(buffer);
+
+                    var parsed = (SavedModifierGroupStatTypesBuffer)buffer.Data!;
+                    groups.Entries.AddRange(parsed.Entries);
+                    parsedOk = parsed.IsParsed;
+                }
+                else
+                {
+                    using var reader = new ModifiersBufferReader(new MemoryStream(bytes));
+                    reader.ReadBuffer(buffer);
+
+                    var parsed = (ModifiersBuffer)buffer.Data!;
+                    if (kind == ModifiersKind || kind == ForcedModifiersKind)
                     {
-                        sliceIndices.Add((ushort)i);
-                        return;
+                        (kind == ForcedModifiersKind ? forcedModifiers : modifiers).Entries.AddRange(parsed.Entries);
+                    }
+
+                    // Slices of other kinds are kept as they are
+                    parsedOk = parsed.IsParsed && (kind == ModifiersKind || kind == ForcedModifiersKind);
+                }
+
+                if (!parsedOk)
+                {
+                    if (!_unparsed.TryGetValue(optimized, out var kinds))
+                    {
+                        _unparsed[optimized] = kinds = new HashSet<uint>();
+                    }
+                    kinds.Add(kind);
+                }
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// Writes the stats handed out by <see cref="Get"/> and <see cref="Add"/> back into the optimized structure.
+        /// Unchanged entries are left untouched, so calling this repeatedly is safe.
+        /// </summary>
+        public void Flush()
+        {
+            if (_materialized.Count == 0)
+            {
+                return;
+            }
+
+            var writer = new SliceWriter(_map);
+
+            foreach (var (optimized, data) in _materialized)
+            {
+                var recordIndex = GetOrAddIndex(_map.SharedRecordId, data.RecordID);
+                if (optimized.RecordIDIndex != recordIndex)
+                {
+                    optimized.RecordIDIndex = recordIndex;
+                }
+
+                if (optimized.Seed != data.Seed)
+                {
+                    optimized.Seed = data.Seed;
+                }
+
+                if (!ReferenceEquals(optimized.StatModifiers, data.StatModifiers))
+                {
+                    optimized.StatModifiers = data.StatModifiers ?? new();
+                }
+
+                var inactiveIndices = data.InactiveStats
+                    .Select(x => GetOrAddIndex(_map.SharedInactiveStats, x))
+                    .ToList();
+                SetIfChanged(optimized.InactiveStatsIndices, inactiveIndices, x => optimized.InactiveStatsIndices = x);
+
+                _unparsed.TryGetValue(optimized, out var unparsedKinds);
+                var currentSlices = optimized.BufferSliceIndices.Select(x => (ushort)x).ToList();
+
+                // Each kind is written back to its own slices, in the order the entry had them. Content that didn't
+                // change keeps its slices, so unchanged entries stay byte for byte the same.
+                var kinds = currentSlices.Select(SliceKind)
+                    .Concat(new[] { ModifiersKind, ForcedModifiersKind, ModifierGroupsKind })
+                    .Distinct()
+                    .ToList();
+
+                var sliceIndices = new List<ushort>();
+                foreach (var kind in kinds)
+                {
+                    var existing = currentSlices.Where(x => SliceKind(x) == kind).ToList();
+
+                    // Rewriting a slice we couldn't fully read would lose the parts we didn't understand
+                    if (unparsedKinds != null && unparsedKinds.Contains(kind))
+                    {
+                        sliceIndices.AddRange(existing);
+                        continue;
+                    }
+
+                    var bytes = Encode(kind, data);
+                    if (bytes.AsSpan().SequenceEqual(existing.SelectMany(x => GetSlice(x).Bytes).ToArray()))
+                    {
+                        sliceIndices.AddRange(existing);
+                    }
+                    else if (bytes.Length > 0)
+                    {
+                        sliceIndices.Add(writer.GetSlice(kind, bytes, currentSlices));
                     }
                 }
 
-                if (dataEnd + bytes.Length > data.Length)
+                SetIfChanged(optimized.BufferSliceIndices, sliceIndices, x => optimized.BufferSliceIndices = x);
+            }
+
+            writer.Commit();
+        }
+
+        private uint SliceKind(ushort index) => (uint)_map.SharedBufferSlices[index].Combined >> KindShift;
+
+        private static byte[] Encode(uint kind, gameSavedStatsData data)
+        {
+            using var ms = new MemoryStream();
+
+            if (kind == ModifierGroupsKind)
+            {
+                if (data.SavedModifierGroupStatTypesBuffer?.Data is SavedModifierGroupStatTypesBuffer { Entries.Count: > 0 } groups)
                 {
-                    var newSize = Math.Max(data.Length, 1);
-                    while (newSize < dataEnd + bytes.Length)
-                    {
-                        newSize *= 2;
-                    }
-                    Array.Resize(ref data, newSize);
+                    using var groupsWriter = new SavedModifierGroupStatTypesBufferWriter(ms);
+                    groupsWriter.WriteBuffer(groups);
                 }
-
-                bytes.CopyTo(data, dataEnd);
-
-                _statsMap.SharedBufferSlices.Add(new gameBufferSlice
+            }
+            else
+            {
+                var buffer = kind == ForcedModifiersKind ? data.ForcedModifiersBuffer : data.ModifiersBuffer;
+                if (buffer?.Data is ModifiersBuffer { Entries.Count: > 0 } modifiers)
                 {
-                    Offset = (uint)dataEnd,
-                    Combined = (uint)bytes.Length | (kind << KindShift)
-                });
-                sliceIndices.Add((ushort)(_statsMap.SharedBufferSlices.Count - 1));
-
-                dataEnd += bytes.Length;
-                dataChanged = true;
+                    using var modifiersWriter = new ModifiersBufferWriter(ms);
+                    modifiersWriter.WriteBuffer(modifiers);
+                }
             }
-        }
 
-        if (_statsMap.SharedBufferSlices.Count > ushort.MaxValue + 1 || _statsMap.SharedRecordId.Count > ushort.MaxValue + 1 || _statsMap.SharedInactiveStats.Count > ushort.MaxValue + 1)
-        {
-            throw new InvalidOperationException("Too many stats entries to save.");
-        }
-
-        if (dataChanged)
-        {
-            _statsMap.SharedDataBuffer.Buffer.SetBytes(data);
-        }
-
-        return warnings;
-    }
-
-    private gameSavedStatsData CreateView(gameSavedStatsDataOptimized entry)
-    {
-        var view = new gameSavedStatsData
-        {
-            Seed = entry.Seed,
-            ModifiersBuffer = ReadSlices(entry, ModifiersKind),
-            ForcedModifiersBuffer = ReadSlices(entry, ForcedModifiersKind)
-        };
-
-        if (entry.RecordIDIndex < _statsMap.SharedRecordId.Count)
-        {
-            view.RecordID = _statsMap.SharedRecordId[entry.RecordIDIndex];
-        }
-
-        foreach (var index in entry.InactiveStatsIndices)
-        {
-            view.InactiveStats.Add(_statsMap.SharedInactiveStats[index]);
-        }
-
-        return view;
-    }
-
-    private DataBuffer ReadSlices(gameSavedStatsDataOptimized entry, uint kind)
-    {
-        var data = _statsMap.SharedDataBuffer.Buffer.GetBytes();
-
-        using var ms = new MemoryStream();
-        foreach (var index in entry.BufferSliceIndices)
-        {
-            var slice = _statsMap.SharedBufferSlices[index];
-            if (GetKind(slice) == kind)
-            {
-                ms.Write(data, (int)(uint)slice.Offset, (int)(slice.Combined & LengthMask));
-            }
-        }
-
-        // ModifiersBufferReader keeps the raw bytes (IsParsed = false) if it can't parse them
-        var buffer = new DataBuffer(ms.ToArray());
-        using var reader = new ModifiersBufferReader(new MemoryStream(buffer.Buffer.GetBytes()));
-        reader.ReadBuffer(buffer.Buffer);
-
-        return buffer;
-    }
-
-    private static uint GetKind(gameBufferSlice slice) => (uint)slice.Combined >> KindShift;
-
-    private static byte[] Encode(DataBuffer buffer)
-    {
-        if (buffer?.Data is ModifiersBuffer { IsParsed: true } modifiersBuffer)
-        {
-            var ms = new MemoryStream();
-            using (var writer = new ModifiersBufferWriter(ms))
-            {
-                writer.WriteBuffer(modifiersBuffer);
-            }
             return ms.ToArray();
         }
 
-        return buffer?.Buffer.GetBytes() ?? Array.Empty<byte>();
-    }
-
-    private static byte[] GetFingerprint(gameSavedStatsData view)
-    {
-        using var ms = new MemoryStream();
-        using var bw = new BinaryWriter(ms);
-
-        var modifiers = Encode(view.ModifiersBuffer);
-        bw.Write(modifiers.Length);
-        bw.Write(modifiers);
-
-        var forcedModifiers = Encode(view.ForcedModifiersBuffer);
-        bw.Write(forcedModifiers.Length);
-        bw.Write(forcedModifiers);
-
-        bw.Write(view.InactiveStats.Count);
-        foreach (var inactiveStat in view.InactiveStats)
+        private (uint Kind, byte[] Bytes) GetSlice(ushort index)
         {
-            bw.Write(Convert.ToInt64((gamedataStatType)inactiveStat));
+            var slice = _map.SharedBufferSlices[index];
+            var combined = (uint)slice.Combined;
+            var bytes = _map.SharedDataBuffer.Buffer.GetBytes().AsSpan((int)(uint)slice.Offset, (int)(combined & SizeMask)).ToArray();
+
+            return (combined >> KindShift, bytes);
         }
 
-        bw.Write((ulong)view.RecordID);
-        bw.Write((uint)view.Seed);
-
-        return ms.ToArray();
-    }
-
-    private static int GetOrAdd<T>(CArray<T> array, T value) where T : IRedType
-    {
-        var index = array.IndexOf(value);
-        if (index == -1)
+        private static ushort GetOrAddIndex<T>(CArray<T> list, T value) where T : IRedType
         {
-            array.Add(value);
-            index = array.Count - 1;
+            var index = list.IndexOf(value);
+            if (index == -1)
+            {
+                list.Add(value);
+                index = list.Count - 1;
+            }
+
+            return (ushort)index;
         }
-        return index;
+
+        private static void SetIfChanged(CArray<CUInt16> current, List<ushort> wanted, Action<CArray<CUInt16>> setter)
+        {
+            if (current.Select(x => (ushort)x).SequenceEqual(wanted))
+            {
+                return;
+            }
+
+            var array = new CArray<CUInt16>();
+            foreach (var value in wanted)
+            {
+                array.Add(value);
+            }
+
+            setter(array);
+        }
+
+        /// <summary>
+        /// Finds or appends slices in the shared buffer.
+        /// </summary>
+        private class SliceWriter
+        {
+            private readonly gameStatsStateMapStructure _map;
+
+            private byte[] _bytes;
+            private int _usedEnd;
+            private bool _changed;
+            private Dictionary<(uint, string), ushort> _existing;
+
+            public SliceWriter(gameStatsStateMapStructure map)
+            {
+                _map = map;
+                _map.SharedDataBuffer ??= new DataBuffer();
+                _bytes = _map.SharedDataBuffer.Buffer?.GetBytes() ?? Array.Empty<byte>();
+                _usedEnd = _map.SharedBufferSlices.Count == 0
+                    ? 0
+                    : _map.SharedBufferSlices.Max(x => (int)(uint)x.Offset + (int)((uint)x.Combined & SizeMask));
+            }
+
+            /// <summary>
+            /// Returns the index of a slice with this content, preferring one the entry already uses.
+            /// </summary>
+            public ushort GetSlice(uint kind, byte[] bytes, List<ushort> preferred)
+            {
+                foreach (var index in preferred)
+                {
+                    if (Matches(index, kind, bytes))
+                    {
+                        return index;
+                    }
+                }
+
+                // Same deduplication the game does, keeps repeated saves from growing the buffer
+                if (_existing == null)
+                {
+                    _existing = new();
+                    for (var i = 0; i < _map.SharedBufferSlices.Count; i++)
+                    {
+                        var slice = _map.SharedBufferSlices[i];
+                        var sliceKind = (uint)slice.Combined >> KindShift;
+                        _existing.TryAdd((sliceKind, Convert.ToBase64String(SliceBytes(slice))), (ushort)i);
+                    }
+                }
+
+                var key = (kind, Convert.ToBase64String(bytes));
+                if (_existing.TryGetValue(key, out var existingIndex))
+                {
+                    return existingIndex;
+                }
+
+                if (_usedEnd + bytes.Length > _bytes.Length)
+                {
+                    // The game allocates the buffer in powers of two
+                    var newSize = (int)BitOperations.RoundUpToPowerOf2((uint)(_usedEnd + bytes.Length));
+                    Array.Resize(ref _bytes, newSize);
+                }
+
+                Buffer.BlockCopy(bytes, 0, _bytes, _usedEnd, bytes.Length);
+
+                _map.SharedBufferSlices.Add(new gameBufferSlice
+                {
+                    Offset = (uint)_usedEnd,
+                    Combined = (uint)bytes.Length | kind << KindShift
+                });
+
+                _usedEnd += bytes.Length;
+                _changed = true;
+
+                var newIndex = (ushort)(_map.SharedBufferSlices.Count - 1);
+                _existing.Add(key, newIndex);
+
+                return newIndex;
+            }
+
+            public void Commit()
+            {
+                if (_changed)
+                {
+                    _map.SharedDataBuffer.Buffer = RedBuffer.CreateBuffer(0, _bytes);
+                }
+            }
+
+            private bool Matches(ushort index, uint kind, byte[] bytes)
+            {
+                var slice = _map.SharedBufferSlices[index];
+                return (uint)slice.Combined >> KindShift == kind && SliceBytes(slice).AsSpan().SequenceEqual(bytes);
+            }
+
+            private byte[] SliceBytes(gameBufferSlice slice) =>
+                _bytes.AsSpan((int)(uint)slice.Offset, (int)((uint)slice.Combined & SizeMask)).ToArray();
+        }
     }
 }

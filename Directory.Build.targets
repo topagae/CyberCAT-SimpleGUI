@@ -3,7 +3,7 @@
     The WolvenKit submodule points at upstream WolvenKit. This repository's changes to it are kept in
     patches/WolvenKit.patch and applied here, before WolvenKit.Core builds. Every other WolvenKit project
     depends on WolvenKit.Core, so the patch is in place before any patched file is compiled.
-    See "Updating WolvenKit" in README.md.
+    See "Changes to WolvenKit" in README.md.
   -->
   <PropertyGroup>
     <WolvenKitPatch>$(MSBuildThisFileDirectory)patches\WolvenKit.patch</WolvenKitPatch>
@@ -19,7 +19,7 @@
       <Output TaskParameter="ExitCode" PropertyName="_WolvenKitPatchApply" />
     </Exec>
 
-    <Error Condition="'$(_WolvenKitPatchReverseCheck)' != '0' And '$(_WolvenKitPatchApply)' != '0'" Text="patches\WolvenKit.patch could not be applied to the WolvenKit submodule. If WolvenKit was updated or changed on purpose, see &quot;Updating WolvenKit&quot; in README.md. Otherwise reset it with: git submodule update --init --force" />
+    <Error Condition="'$(_WolvenKitPatchReverseCheck)' != '0' And '$(_WolvenKitPatchApply)' != '0'" Text="patches\WolvenKit.patch could not be applied to the WolvenKit submodule. If WolvenKit was updated or changed on purpose, see &quot;Changes to WolvenKit&quot; in README.md. Otherwise reset it with: git submodule update --init --force" />
     <Message Condition="'$(_WolvenKitPatchReverseCheck)' != '0' And '$(_WolvenKitPatchApply)' == '0'" Importance="high" Text="Applied patches\WolvenKit.patch to the WolvenKit submodule" />
   </Target>
 

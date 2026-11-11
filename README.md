@@ -1,160 +1,138 @@
-# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29e)
+﻿# CyberCAT-SimpleGUI
 
-A save editor for Cyberpunk 2077, updated to work with **patch 2.5** saves.
+A save editor for Cyberpunk 2077, including patch 2.5. A simplified offshoot of SirBitesalot's CyberCAT, by Deweh and contributors.
 
-This is an **unofficial fork** of [CyberCAT-SimpleGUI by Deweh (DeweySalt)](https://github.com/Deweh/CyberCAT-SimpleGUI). The original editor was a simplified offshoot of SirBitesalot's [CyberCAT](https://github.com/WolvenKit/CyberCAT). The original stopped working with patch 2.5 saves, and this fork fixes that. All credit for the editor itself goes to the original authors, see [Credits](#credits).
+**Download:** [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/718) or the [latest GitHub release](https://github.com/Deweh/CyberCAT-SimpleGUI/releases/latest). Extract the whole zip into a folder before running the editor.
 
-## ⬇️ Download (no coding needed)
-
-1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29e-win-x64.zip** under **Assets**.
-2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
-3. Open the extracted `CP2077SaveEditor-v0.29e` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
-4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
-
-Requires 64-bit Windows 10 or 11.
-
-## ⚠️ Read this first
-
-- **Back up your saves before using this.** Copy the whole save folder from `%USERPROFILE%\Saved Games\CD Projekt Red\Cyberpunk 2077\` to somewhere safe.
-- **This update has had very little in-game testing.** Only one patch 2.5 save has been loaded in the game after editing, with edits to stats and attributes (numbers) and appearance.
-- **Everything else has been tested by code only, not in the game.** That covers inventory, vehicles, quest facts, the extras tab, changing body gender, saves from patches 2.0 to 2.31, and modded saves. Automated tests on real saves from patches 2.0, 2.01, 2.31 and 2.5 load each save, edit it, write it and read it back without losing data. That makes a working save likely, but it doesn't prove the game will accept it.
-- Save into a **new save slot** rather than over your only copy. When you overwrite a `sav.dat`, the editor keeps the previous file as `sav.old`.
-- Editing quest facts and inventory flags can break quests or items in ways that only show up hours later. Keep your backup for a while.
-- Please report problems with the `error.txt` the editor creates next to the exe, the game version, and what you changed.
-
-## What's new in v0.29e
-
-[RELEASE_NOTES.md](RELEASE_NOTES.md) has the full release post.
-
-- **Large saves** that failed with "Exception of type 'System.Exception' was thrown" now load and save.
-- **Saves that grow while editing** can be saved, the editor makes room like the game does.
-- **Clearer errors** for files that aren't PC saves or are damaged.
-
-## What's new in v0.29d
-
-[RELEASE_NOTES.md](RELEASE_NOTES.md) has the full release post.
-
-- **Appearance presets and body gender changes work again.** In v0.29a to v0.29c they failed with "Minor version contains invalid character".
-- **Saves using lifepath mods** (like Fresh Start) load, and their lifepath is kept.
-- **"Unlock all fast travel points"** only adds missing points, instead of replacing the list and losing ones the editor doesn't know about.
-- **Ctrl+S / Ctrl+O** save and open, also where the buttons don't show (Wine, Proton).
-- Clearer messages when `kraken.dll` can't be loaded, and on what the romance button can and can't do.
-
-## What's new in v0.29c
-
-- **Changing body gender works again.** It used to leave a mix of both body types with the old head, and the game could crash at the mirror. The new body now gets a complete appearance made for patch 2.5, and a change that can't be made leaves the save untouched.
-- **Saves with script mods:** the player and NPC data that some mods add fields to is now read and kept. Previously the editor skipped that data, so body gender couldn't be changed on those saves.
-
-## What's new in v0.29a
-
-- **Patch 2.5 support.** Patch 2.5 saves load and save, including stat editing. Patch 2.5 changed the format the game uses to store stats.
-- **Mod data is kept.** Older versions silently deleted stat and perk values they didn't recognise (for example values added by mods) when saving, and that affected patch 2.x saves too. These values are now kept and written back unchanged.
-- **Unchanged data stays unchanged.** Parts of the save you don't edit are written back as they were.
-- **Fix:** adding stats to a new item wrote its unique counter into the wrong field.
-- The window title and status bar show the version, and clicking the version in the status bar opens the credits.
+**What's new:** see [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
-**Feature**                                                                     | **Stability**
-------------------------------------------------------------------------------- | -----------
-Edit attributes, perk / attribute / relic points, level, street cred and skill levels. | Stable (tested in game on 2.5)
-Edit your character's appearance, and save / load appearance presets.           | Stable (tested in game on 2.5)
-Edit the quantity, flags, stats & mod tree of items in your inventory.          | Stable (2.5: not tested in game)
-Edit vehicles.                                                                  | 2.5: not tested in game
-Edit quest facts.                                                               | Stable (2.5: not tested in game)
-Quick actions: money, legendary items, unlock fast travel, clear blacklist, and more. | Semi-Stable (2.5: not tested in game)
+- **Saves browser:** your saves with screenshot, level, life path, play time and patch; double click to open.
+- **Safe saving:** timestamped backups (last 5), the file is verified before replacing `sav.dat`, warning on unsaved changes, `Ctrl+S`.
+- **Undo/redo:** `Ctrl+Z` / `Ctrl+Y` (outside text fields), up to 10 steps. Edits made in quick succession count as one step.
+- **Inventory:** in-game item names (English or Brazilian Portuguese), search with filters (`type:`, `slot:`, `quantity:`...), add any item, copy/paste, move between inventory and stash, bulk *Make Tier 5++* and *Set Quantity*, crafting components, money.
+- **Items:** quantity, flags, mod tree and stats of each item.
+- **Player:** level, attributes, skills, perk/attribute/relic points.
+- **Perks:** the 2.0 skill trees and Relic perks, with or without spending points.
+- **Cyberware:** equip any cyberware in any slot of its body area and raise the cyberware capacity.
+- **Vehicles:** unlock or lock any player vehicle.
+- **Appearance:** presets, voice, and body gender (with a complete default appearance for the new body).
+- **Quest facts, fast travel** and support for several mods' saved data.
+- **Modded saves:** stat types and other values added by mods, data that script mods add to V and NPCs, and lifepath mods (shown as "Modded") are kept and written back unchanged.
 
-### Use cases
+Saves from game versions newer than the editor supports open read-only, so they can't be damaged.
 
-- Respec your attributes or fix lost perk points without starting over.
-- Change V's appearance after character creation.
-- Adjust item quantities, quality or mods, or recover items.
-- Fix stuck quests by editing quest facts (be careful, see the warnings above).
-- Unlock fast travel points or clear the police blacklist.
+## Game Version Support
 
-## Game version support
-
-**Game Version**    | **Support**    | **CyberCAT-SimpleGUI Version**
---------------------| ---------------|-----------------------------
-Patch 2.5           | Full*          | v0.29a (this fork)
-Patch 2.0 - 2.31    | Full           | v0.29a (this fork), original releases for older versions
-Patch 1.x           | Not in v0.29a  | Use the [original releases](https://github.com/Deweh/CyberCAT-SimpleGUI/releases) (1.5X: >=v0.20a, 1.3: >=v0.10a_r1, 1.23: >=v0.10a)
-
-\* **Known limitation:** changes to *modifier groups* (in the advanced stats editor) can't be saved for patch 2.5 saves yet. The editor warns you when you save instead of silently dropping them. All other stat changes are saved.
+**Game Version**    | **Support** | **CyberCAT-SimpleGUI Version**
+--------------------| ------------|-----------------------------
+Patch 2.5           | Full        | >=v0.29.0
+Patch 2.0 - 2.3     | Full        | >=v0.28c
+Patch 1.5X          | Full        | >=v0.20a
+Patch 1.3           | Partial     | >=v0.10a_r1
+Patch 1.23          | Full        | >=v0.10a
 
 ## Usage
 
-1. Download and extract the zip (see Download at the top), then run **CP2077SaveEditor.exe**. It's self-contained, so you don't need to install .NET.
-2. Click **"Load Save"** and pick a `sav.dat` from your save folder.
-3. Make your changes.
-    - Double-click items in your inventory to edit them.
-    - Double-click nodes in an item's mod tree to edit them.
-4. Click **"Save Changes"** and choose a save folder. Saving into the root save folder isn't allowed.
+Requires the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (x64).
 
-The window opens right away. Loading the game's name tables takes a few more seconds, and **"Load Save"** becomes clickable when that finishes. The editor uses around 1.7 GB of RAM.
+1. Run **CP2077SaveEditor.exe** and double click a save (or use **Load Save** for one somewhere else).
+2. Make your changes. Double click items in the inventory to edit them.
+3. Click **Save** (`Ctrl+S`) to overwrite the loaded save, or **Save As...** to write it into another save folder.
 
-## Code signing policy
+Errors are written to `logs\` next to the executable, attach that file to bug reports.
 
-Releases are currently **unsigned**, so Windows SmartScreen may warn when you first run the editor. This project has applied for free code signing from SignPath Foundation.
+**Always keep a copy of your saves.** The editor keeps backups too, but edits to quest facts and item flags can break things hours later in the game.
 
-- **Builds:** release zips are built from this repository's source by GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)). Only the editor's own binaries (CP2077SaveEditor and WolvenKit, built from source here) will be signed.
-- **Team roles:**
-  - Committers and reviewers: [topagae](https://github.com/topagae)
-  - Approvers: [topagae](https://github.com/topagae)
-- **Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. See [PRIVACY.md](PRIVACY.md).
+If loading fails with a message about `kraken.dll`, the zip wasn't fully extracted or an antivirus quarantined the file. Antivirus false positives happen with unsigned tools like this one; the full source is in this repository.
+
+The editor follows the Windows light/dark setting. To force one, create a `config.json` next to the executable with `{ "Theme": 1 }` (light) or `{ "Theme": 2 }` (dark).
+
+Other `config.json` options: `"UndoSteps"` (default 10, `0` turns undo off; each step keeps ~4 MB in memory) and `"CheckForUpdates": 0` to skip the update check on startup.
+
+Planned work is tracked in [TODO.md](TODO.md).
 
 ## Credits
 
-- **[CyberCAT-SimpleGUI](https://github.com/Deweh/CyberCAT-SimpleGUI)** by Deweh (DeweySalt), with contributions from seberoth, Merijn Hendriks, Alain Dupuis and others. It's the editor this fork is based on.
-- **[CyberCAT](https://github.com/WolvenKit/CyberCAT)** by SirBitesalot and contributors. It's the project the original editor came from.
-- **[WolvenKit](https://github.com/WolvenKit/WolvenKit)** by the WolvenKit team. It reads and writes the save files, and this fork adds a few patch 2.5 fixes to it (see [NOTICE.md](NOTICE.md)).
-- **[K4os.Compression.LZ4](https://github.com/MiloszKrajewski/K4os.Compression.LZ4)** by Milosz Krajewski.
-- **Patch 2.5 update (v0.29a and later):** written about 95% by **Claude** (Anthropic's AI model, using Claude Code), and about 5% by **topagae**, who directed and tested it.
+- [Deweh (DeweySalt)](https://github.com/Deweh), the original CyberCAT-SimpleGUI, and Papayu for later releases
+- [bernardomcma](https://github.com/bernardomcma), patch 2.5 support and the v0.29/v0.30 features
+- [topagae](https://github.com/topagae), patch 2.5 fixes merged in v0.30.1 (stats, modded saves, body gender, large saves, licensing), written about 95% by Claude (Anthropic's AI model, via Claude Code) and directed and tested by topagae
+- [CyberCAT by SirBitesalot and other contributors](https://github.com/WolvenKit/CyberCAT)
+- [WolvenKit by the WolvenKit team](https://github.com/WolvenKit/WolvenKit)
 
 ## License
 
-The editor's source code is under the [MIT License](LICENSE). It is built together with WolvenKit, which is under the [GPL-3.0](licenses/WolvenKit.LICENSE.txt), so the released program as a whole is distributed under the GPL-3.0, and its full source, including the modified WolvenKit files, is available. Third-party licenses are in [licenses/](licenses/). [NOTICE.md](NOTICE.md) lists every change made in this fork.
+The editor's source code is MIT licensed, see [LICENSE](LICENSE). The release also contains WolvenKit and the Kraken
+decompressor, which are licensed under the GNU GPL v3.0, so the program as distributed is covered by the GPL v3.0.
+Anyone who redistributes it must also make the corresponding source available: this repository at the release's tag,
+including the `WolvenKit` submodule commit and `patches/WolvenKit.patch`.
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists every component in the release with its license, and the release
+zip includes these files.
 
-## Building
+## Contribution
 
-**Requires:** .NET 8 SDK and git, on Windows.
+Clone with submodules (`git clone --recursive`, or `git submodule update --init` on an existing clone).
+Newer game patches usually need the `WolvenKit` submodule updated to a commit that supports them.
+
+### Changes to WolvenKit
+
+The `WolvenKit` submodule points at upstream [WolvenKit](https://github.com/WolvenKit/WolvenKit). This repository's
+changes to it are kept in [patches/WolvenKit.patch](patches/WolvenKit.patch), and
+[Directory.Build.targets](Directory.Build.targets) applies the patch before WolvenKit builds (and skips it when it's
+already applied). Each modified WolvenKit file is marked in its first line, as the GPL requires.
+
+To change WolvenKit code: edit the files in `WolvenKit/`, then run `tools/update-wolvenkit-patch.ps1` and commit the
+updated patch. After updating the submodule to a newer WolvenKit, reset it (`git submodule update --init --force`),
+check that the patch still applies, and fix it where it doesn't.
+
+### Tests
+
+Round-trip tests (load, edit, save, reload) run against a real save, which is not part of the repository.
+Point `CP2077_TEST_SAVE` to a `sav.dat` (ideally a copy) and run:
 
 ```
-git clone --recurse-submodules <this repository>
-dotnet build CP2077SaveEditor.sln -c Release -p:Platform=x64
+dotnet test --project CP2077SaveEditor.Tests/CP2077SaveEditor.Tests.csproj -p:Platform=x64
 ```
 
-The build applies this fork's WolvenKit changes automatically (see below).
+Without the variable the tests are skipped.
 
-To build a self-contained release into `releases/v<version>/`, with the docs and licenses included:
+### Releases
+
+Pushing a version tag (`v0.30.1`) builds the release, attaches the zip to a GitHub release, and optionally:
+
+- **Uploads it to Nexus Mods** as a new version of the main file, with the matching `CHANGELOG.md` section as the
+  changelog. Set the repository variables `NEXUS_MOD_ID` and `NEXUS_FILE_ID` and the secret `NEXUS_API_KEY`
+  ([API keys](https://www.nexusmods.com/settings/api-keys)). Both IDs are shown on the mod page's Files tab with
+  "Advanced" checked.
+- **Scans it with VirusTotal** first: set the secret `VIRUSTOTAL_API_KEY` (a free key works). Results are in the run
+  summary. `VIRUSTOTAL_MAX_DETECTIONS` holds the Nexus upload when more engines flag the zip, since Nexus quarantines
+  uploads with too many detections.
+
+Before tagging, bump `<Version>` in `CP2077SaveEditor/CP2077SaveEditor.csproj` and add a section to `CHANGELOG.md`.
+
+### Game data
+
+Item classes, names, perks, vehicles and cyberware come from the game files. After a game patch, regenerate them with:
 
 ```
-dotnet publish CP2077SaveEditor/CP2077SaveEditor.csproj -p:PublishProfile=win-x64
+dotnet run --project ResourceGenerator -p:Platform=x64 -- "<game folder>" all --out CP2077SaveEditor/Resources
 ```
 
-The version is set in [CP2077SaveEditor.csproj](CP2077SaveEditor/CP2077SaveEditor.csproj). `DisplayVersion` (like `0.29e`) is what the window title, status bar, credits dialog and release folder show. `Version` must stay numeric (like `0.29.4`): WolvenKit reads it as strict SemVer when it loads or saves appearance presets, and a letter in it breaks them. Bump both for a release.
+### VSCodium
 
-### Updating WolvenKit
+**Task** | **Info**
+-------- | ----------------------------------
+Requires | .NET 10 SDK
+Setup    | None
+Build    | Terminal > Run Build Task...
+Debug    | Unsupported
 
-The `WolvenKit` folder is a git submodule pointing at upstream [WolvenKit](https://github.com/WolvenKit/WolvenKit). This fork's changes to it are kept in [patches/WolvenKit.patch](patches/WolvenKit.patch). [Directory.Build.targets](Directory.Build.targets) applies the patch before WolvenKit builds, and skips it when it's already applied. Each modified WolvenKit file is marked in its first line.
+### Visual Studio
 
-To change WolvenKit code: edit the files in `WolvenKit/`, then run `tools/update-wolvenkit-patch.ps1` and commit the updated patch.
-
-To move to a newer WolvenKit version (for example after a game patch):
-
-```
-git -C WolvenKit apply -R ../patches/WolvenKit.patch
-git -C WolvenKit fetch origin
-git -C WolvenKit checkout <new commit>
-git -C WolvenKit apply --3way ../patches/WolvenKit.patch
-```
-
-Resolve any conflicts. Drop the changes that upstream already includes, such as the backported patch 2.5 classes. Then run `tools/update-wolvenkit-patch.ps1`, build, and commit the patch together with the new submodule commit. Once upstream has every change, delete the patch file.
-
-## Todo
-
-- Save modifier group changes for patch 2.5 saves.
-- Get the WolvenKit fixes upstream.
-- Refactor, refactor, refactor.
-- Eat some of the spaghetti.
-- Improve the functionality of the appearance tab.
+**Task** | **Info**
+-------- | ----------------------------------
+Requires | A version with .NET 10 support, C# Desktop workspace
+Setup    | Solution > Restore NuGet Packages
+Build    | Build > Rebuild Solution
+Debug    | Debug > Start Debugging

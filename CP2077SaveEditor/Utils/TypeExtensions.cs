@@ -5,180 +5,196 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-namespace CP2077SaveEditor.Extensions;
-
-public static class ListViewExtensions
+namespace CP2077SaveEditor.Extensions
 {
-    public static void RetrieveDefaultVirtualItem(object sender, RetrieveVirtualItemEventArgs e)
+    public static class ListViewExtensions
     {
-        e.Item = ((ListView)sender).GetVirtualInfo().Items[e.ItemIndex];
-    }
-
-    private static void DefaultColumnClick(object sender, ColumnClickEventArgs e)
-    {
-        ((ListView)sender).SortVirtualItems(e.Column);
-    }
-
-    public static void SetVirtualItems(this ListView targetView, List<ListViewItem> newList)
-    {
-        if (targetView.Tag == null)
+        public static void RetrieveDefaultVirtualItem(object sender, RetrieveVirtualItemEventArgs e)
         {
-            targetView.GetType().GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(targetView, true, null);
-            targetView.RetrieveVirtualItem += RetrieveDefaultVirtualItem;
-            targetView.ColumnClick += DefaultColumnClick;
-            targetView.Tag = new VirtualInfo(newList);
-        }
-        else
-        {
-            targetView.GetVirtualInfo().Items = newList;
+            var listView = (ListView)sender;
+            var items = listView.GetVirtualInfo().Items;
+
+            // The ListView can still ask for an old index while the list is shrinking
+            e.Item = e.ItemIndex < items.Count
+                ? items[e.ItemIndex]
+                : new ListViewItem(new string[Math.Max(listView.Columns.Count, 1)]);
         }
 
-        targetView.VirtualListSize = newList.Count();
-        targetView.SortVirtualItems();
-    }
-
-    public static void RemoveVirtualItem(this ListView targetView, ListViewItem targetItem)
-    {
-        targetView.GetVirtualInfo().Items.Remove(targetItem);
-        targetView.VirtualListSize -= 1;
-        targetView.SortVirtualItems();
-    }
-
-    public static List<ListViewItem> SelectedVirtualItems(this ListView targetView)
-    {
-        var selectedList = new List<ListViewItem>();
-        foreach (int i in targetView.SelectedIndices)
+        private static void DefaultColumnClick(object sender, ColumnClickEventArgs e)
         {
-            selectedList.Add(targetView.Items[i]);
+            ((ListView)sender).SortVirtualItems(e.Column);
         }
-        return selectedList;
-    }
 
-    public static void SortVirtualItems(this ListView targetView, int column = -1)
-    {
-        var info = targetView.GetVirtualInfo();
-        var comparer = new CaseInsensitiveComparer();
-
-        int Compare(ListViewItem x, ListViewItem y)
+        public static void SetVirtualItems(this ListView targetView, List<ListViewItem> newList)
         {
-            int compareResult;
-
-            if (int.TryParse(x.SubItems[info.SortColumn].Text, out _) && int.TryParse(y.SubItems[info.SortColumn].Text, out _))
+            if (targetView.Tag == null)
             {
-                compareResult = comparer.Compare(int.Parse(y.SubItems[info.SortColumn].Text), int.Parse(x.SubItems[info.SortColumn].Text));
+                targetView.GetType().GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(targetView, true, null);
+                targetView.RetrieveVirtualItem += RetrieveDefaultVirtualItem;
+                targetView.ColumnClick += DefaultColumnClick;
+                targetView.Tag = new VirtualInfo(newList);
             }
             else
             {
-                compareResult = comparer.Compare(x.SubItems[info.SortColumn].Text, y.SubItems[info.SortColumn].Text);
-            }
+                // Selected indices point into the old list
+                targetView.SelectedIndices.Clear();
+                targetView.GetVirtualInfo().Items = newList;
 
-            if (info.SortOrder == SortOrder.Ascending)
-            {
-                return compareResult;
-            }
-            else if (info.SortOrder == SortOrder.Descending)
-            {
-                return (-compareResult);
-            }
-            else
-            {
-                return 0;
-            }
-        }
-
-        if (column > -1)
-        {
-            if (column == info.SortColumn)
-            {
-                if (info.SortOrder == SortOrder.Ascending)
+                // Shrinking a scrolled virtual list leaves the old scroll offset as blank rows at the top
+                if (targetView.IsHandleCreated && targetView.VirtualListSize > 0 && newList.Count < targetView.VirtualListSize)
                 {
-                    info.SortOrder = SortOrder.Descending;
+                    targetView.EnsureVisible(0);
+                }
+            }
+
+            targetView.VirtualListSize = newList.Count();
+            targetView.Invalidate();
+            targetView.SortVirtualItems();
+        }
+
+        public static void RemoveVirtualItem(this ListView targetView, ListViewItem targetItem)
+        {
+            targetView.GetVirtualInfo().Items.Remove(targetItem);
+            targetView.VirtualListSize -= 1;
+            targetView.SortVirtualItems();
+        }
+
+        public static List<ListViewItem> SelectedVirtualItems(this ListView targetView)
+        {
+            var selectedList = new List<ListViewItem>();
+            foreach (int i in targetView.SelectedIndices)
+            {
+                selectedList.Add(targetView.Items[i]);
+            }
+            return selectedList;
+        }
+
+        public static void SortVirtualItems(this ListView targetView, int column = -1)
+        {
+            var info = targetView.GetVirtualInfo();
+            var comparer = new CaseInsensitiveComparer();
+
+            int Compare(ListViewItem x, ListViewItem y)
+            {
+                int compareResult;
+
+                if (int.TryParse(x.SubItems[info.SortColumn].Text, out _) && int.TryParse(y.SubItems[info.SortColumn].Text, out _))
+                {
+                    compareResult = comparer.Compare(int.Parse(y.SubItems[info.SortColumn].Text), int.Parse(x.SubItems[info.SortColumn].Text));
                 }
                 else
                 {
+                    compareResult = comparer.Compare(x.SubItems[info.SortColumn].Text, y.SubItems[info.SortColumn].Text);
+                }
+
+                if (info.SortOrder == SortOrder.Ascending)
+                {
+                    return compareResult;
+                }
+                else if (info.SortOrder == SortOrder.Descending)
+                {
+                    return (-compareResult);
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+
+            if (column > -1)
+            {
+                if (column == info.SortColumn)
+                {
+                    if (info.SortOrder == SortOrder.Ascending)
+                    {
+                        info.SortOrder = SortOrder.Descending;
+                    }
+                    else
+                    {
+                        info.SortOrder = SortOrder.Ascending;
+                    }
+                }
+                else
+                {
+                    info.SortColumn = column;
                     info.SortOrder = SortOrder.Ascending;
                 }
             }
-            else
+
+            if (info.SortColumn > -1 && info.SortOrder != SortOrder.None)
             {
-                info.SortColumn = column;
-                info.SortOrder = SortOrder.Ascending;
+                info.Items.Sort((x, y) => Compare(x, y));
+            }
+            targetView.Invalidate();
+        }
+
+        public static VirtualInfo GetVirtualInfo(this ListView targetView)
+        {
+            return (VirtualInfo)targetView.Tag;
+        }
+
+        public class VirtualInfo
+        {
+            public List<ListViewItem> Items { get; set; } = new List<ListViewItem>();
+            public int SortColumn { get; set; } = -1;
+            public SortOrder SortOrder { get; set; } = SortOrder.None;
+
+            public VirtualInfo() { }
+
+            public VirtualInfo(List<ListViewItem> _items)
+            {
+                Items = _items;
             }
         }
-
-        if (info.SortColumn > -1 && info.SortOrder != SortOrder.None)
-        {
-            info.Items.Sort((x, y) => Compare(x, y));
-        }
-        targetView.Invalidate();
     }
 
-    public static VirtualInfo GetVirtualInfo(this ListView targetView)
+    public static class StringExtensions
     {
-        return (VirtualInfo)targetView.Tag;
-    }
-
-    public class VirtualInfo
-    {
-        public List<ListViewItem> Items { get; set; } = new List<ListViewItem>();
-        public int SortColumn { get; set; } = -1;
-        public SortOrder SortOrder { get; set; } = SortOrder.None;
-
-        public VirtualInfo() { }
-
-        public VirtualInfo(List<ListViewItem> _items)
+        public static string LastOrIndex(this string[] arr, int position)
         {
-            Items = _items;
+            if (position == -1)
+            {
+                return arr.Last();
+            }
+            else
+            {
+                return arr[position];
+            }
         }
     }
-}
 
-public static class StringExtensions
-{
-    public static string LastOrIndex(this string[] arr, int position)
+    public static class ControlExtensions
     {
-        if (position == -1)
+        [DllImport("user32.dll")]
+        public static extern int SendMessage(IntPtr hWnd, Int32 wMsg, bool wParam, Int32 lParam);
+
+        private const int WM_SETREDRAW = 11;
+
+        public static void SuspendDrawing(this Control parent)
         {
-            return arr.Last();
+            SendMessage(parent.Handle, WM_SETREDRAW, false, 0);
         }
-        else
+
+        public static void ResumeDrawing(this Control parent)
         {
-            return arr[position];
+            SendMessage(parent.Handle, WM_SETREDRAW, true, 0);
+            parent.Refresh();
         }
     }
-}
 
-public static class ControlExtensions
-{
-    [DllImport("user32.dll")]
-    public static extern int SendMessage(IntPtr hWnd, Int32 wMsg, bool wParam, Int32 lParam);
-
-    private const int WM_SETREDRAW = 11;
-
-    public static void SuspendDrawing(this Control parent)
+    public static class NumericUpDownExtensions
     {
-        SendMessage(parent.Handle, WM_SETREDRAW, false, 0);
-    }
-
-    public static void ResumeDrawing(this Control parent)
-    {
-        SendMessage(parent.Handle, WM_SETREDRAW, true, 0);
-        parent.Refresh();
-    }
-}
-
-public static class NumericUpDownExtensions
-{
-    public static void SetValue(this NumericUpDown numericUpDown, decimal value)
-    {
-        if (value < numericUpDown.Minimum)
+        public static void SetValue(this NumericUpDown numericUpDown, decimal value)
         {
-            value = numericUpDown.Minimum;
+            if (value < numericUpDown.Minimum)
+            {
+                value = numericUpDown.Minimum;
+            }
+            else if (value > numericUpDown.Maximum)
+            {
+                value = numericUpDown.Maximum;
+            }
+            numericUpDown.Value = value;
         }
-        else if (value > numericUpDown.Maximum)
-        {
-            value = numericUpDown.Maximum;
-        }
-        numericUpDown.Value = value;
     }
 }

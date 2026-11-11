@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -7,463 +7,564 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing;
 
-namespace CP2077SaveEditor;
-
-[DefaultEvent("Click")]
-public class ModernButton : Panel
+namespace CP2077SaveEditor
 {
-    private Label textLabel = new Label();
-    private Color defaultColor = Color.White;
-    private Color hoverColor = Color.LightGray;
-    private Boolean clickEffectEnabled = true;
-
-    [Browsable(true)]
-    [Category("Style")]
-    public override string Text
+    [DefaultEvent("Click")]
+    public class ModernButton : Panel
     {
-        get { return textLabel.Text; }
-        set { textLabel.Text = value; }
-    }
+        private Label textLabel = new Label();
+        private Color defaultColor = Color.White;
+        private Color hoverColor = Color.LightGray;
+        private Boolean clickEffectEnabled = true;
+        private bool _isSelected;
+        private bool _isHovered;
 
-    [Browsable(true)]
-    [Category("Style")]
-    public Color DefaultColor
-    {
-        get { return defaultColor; }
-        set { defaultColor = value; this.BackColor = value; }
-    }
-
-    [Browsable(true)]
-    [Category("Style")]
-    public Color HoverColor
-    {
-        get { return hoverColor; }
-        set { hoverColor = value; }
-    }
-
-    [Browsable(true)]
-    [Category("Style")]
-    public Color TextColor
-    {
-        get { return textLabel.ForeColor; }
-        set { textLabel.ForeColor = value; }
-    }
-
-    [Browsable(true)]
-    [Category("Style")]
-    public Font TextFont
-    {
-        get { return textLabel.Font; }
-        set { textLabel.Font = value; }
-    }
-
-    [Browsable(true)]
-    [Category("Style")]
-    public Boolean ClickEffectEnabled
-    {
-        get { return clickEffectEnabled; }
-        set { clickEffectEnabled = value; }
-    }
-
-    protected override void OnCreateControl()
-    {
-        base.OnCreateControl();
-        this.Controls.Add(textLabel);
-        this.BorderStyle = BorderStyle.FixedSingle;
-        textLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-        textLabel.AutoSize = false;
-        textLabel.Dock = DockStyle.Fill;
-        textLabel.MouseEnter += TextMouseEnter;
-        textLabel.MouseLeave += TextMouseLeave;
-        textLabel.MouseDown += TextMouseDown;
-        textLabel.MouseUp += TextMouseUp;
-    }
-
-    private void TextMouseEnter(object sender, EventArgs e)
-    {
-        base.OnMouseEnter(e);
-        this.BackColor = HoverColor;
-    }
-
-    private void TextMouseLeave(object sender, EventArgs e)
-    {
-        base.OnMouseLeave(e);
-        this.BackColor = DefaultColor;
-    }
-
-    private void TextMouseDown(object sender, EventArgs e)
-    {
-        if (clickEffectEnabled)
+        [Browsable(true)]
+        [Category("Style")]
+        public override string Text
         {
-            this.BorderStyle = BorderStyle.Fixed3D;
+            get { return textLabel.Text; }
+            set { textLabel.Text = value; }
         }
-    }
 
-    private void TextMouseUp(object sender, EventArgs e)
-    {
-        this.BorderStyle = BorderStyle.FixedSingle;
-        base.OnClick(e);
-    }
-}
-
-public class ModernValuePicker : Panel
-{
-    //Painting
-    private Font[] fonts = new Font[] { new Font("Segoe UI", (float)8.25), new Font("Segoe UI", 13), new Font("Segoe UI", 13, FontStyle.Bold) };
-    private Pen pixelPen = new Pen(Color.Black, 1);
-    private bool[] gStates = new bool[] { false, false, false, false, false };
-    private bool[] enabledStates = new bool[] { true, true };
-    private Rectangle leftRect = new Rectangle(1,1,1,1);
-    private Rectangle rightRect = new Rectangle(1,1,1,1);
-
-    //Other
-    private PickerValueType _type = PickerValueType.Integer;
-    private int _index = 0;
-    private int _maxInt = 99;
-    private int _minInt = 0;
-    private string[] _stringCollection = new string[] { };
-    private string _stringValue = "00";
-
-    public delegate void IndexChangedHandler(ModernValuePicker sender);
-    public event IndexChangedHandler IndexChanged;
-
-    public string PickerName { get; set; } = "Name";
-    public string StringValue
-    {
-        get
+        [Browsable(true)]
+        [Category("Style")]
+        public Color DefaultColor
         {
-            return _stringValue;
+            get { return defaultColor; }
+            set { defaultColor = value; UpdateVisualState(); }
         }
-        set
-        {
-            _stringValue = value;
-            this.Invalidate(new Rectangle(leftRect.Right, leftRect.Top, rightRect.Left - leftRect.Right, 50));
-        }
-    }
-    public bool SuppressIndexChange { get; set; } = false;
 
-    public PickerValueType PickerType
-    {
-        get {
-            return _type;
-        }
-        set
+        [Browsable(true)]
+        [Category("Style")]
+        public Color HoverColor
         {
-            _type = value;
-            SuppressIndexChange = true;
-            Index = 0;
+            get { return hoverColor; }
+            set { hoverColor = value; UpdateVisualState(); }
         }
-    }
 
-    public int Index
-    {
-        get
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public bool IsSelected
         {
-            return _index;
-        }
-        set
-        {
-            if (PickerType == PickerValueType.Integer)
+            get { return _isSelected; }
+            set
             {
-                if (value > MaxIntegerValue)
+                if (_isSelected == value)
                 {
-                    _index = MaxIntegerValue;
+                    return;
                 }
-                else if (value < MinIntegerValue)
+
+                _isSelected = value;
+                if (textLabel.Font != null)
                 {
-                    _index = MinIntegerValue;
+                    textLabel.Font = new Font(textLabel.Font, _isSelected ? FontStyle.Bold : FontStyle.Regular);
                 }
-                else
-                {
-                    _index = value;
-                }
-                StringValue = _index.ToString("00");
+                UpdateVisualState();
+                textLabel.Invalidate();
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Style")]
+        public Color TextColor
+        {
+            get { return textLabel.ForeColor; }
+            set { textLabel.ForeColor = value; }
+        }
+
+        [Browsable(true)]
+        [Category("Style")]
+        public Font TextFont
+        {
+            get { return textLabel.Font; }
+            set { textLabel.Font = _isSelected && value != null ? new Font(value, FontStyle.Bold) : value; }
+        }
+
+        [Browsable(true)]
+        [Category("Style")]
+        public Boolean ClickEffectEnabled
+        {
+            get { return clickEffectEnabled; }
+            set { clickEffectEnabled = value; }
+        }
+
+        // The label is added here rather than in OnCreateControl, so the form's constructor can already
+        // reach it (e.g. to give it the button's tooltip)
+        public ModernButton()
+        {
+            this.Controls.Add(textLabel);
+            this.BorderStyle = BorderStyle.FixedSingle;
+            textLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            textLabel.AutoSize = false;
+            textLabel.Dock = DockStyle.Fill;
+            textLabel.MouseEnter += TextMouseEnter;
+            textLabel.MouseLeave += TextMouseLeave;
+            textLabel.MouseDown += TextMouseDown;
+            textLabel.MouseUp += TextMouseUp;
+            textLabel.Paint += TextPaint;
+        }
+
+        private void UpdateVisualState()
+        {
+            if (_isHovered)
+            {
+                this.BackColor = hoverColor;
+            }
+            else if (_isSelected)
+            {
+                this.BackColor = Utils.Theme.IsDark ? hoverColor : Color.Gainsboro;
             }
             else
             {
-                if (value > StringCollection.Length - 1)
-                {
-                    _index = 0;
-                }
-                else if (value < 0)
-                {
-                    _index = StringCollection.Length - 1;
-                }
-                else
-                {
-                    _index = value;
-                }
-
-                if (StringCollection.Length < 1)
-                {
-                    StringValue = string.Empty;
-                } else {
-                    StringValue = StringCollection[_index];
-                }
+                this.BackColor = defaultColor;
             }
+        }
 
-            if (SuppressIndexChange == true)
+        private void TextPaint(object sender, PaintEventArgs e)
+        {
+            if (_iconGlyph != null && s_iconFont.Value != null)
             {
-                SuppressIndexChange = false;
-            } else {
-                if (IndexChanged != null) { IndexChanged(this); }
+                var iconBounds = new Rectangle(8, 0, IconWidth, textLabel.Height);
+                TextRenderer.DrawText(e.Graphics, _iconGlyph, s_iconFont.Value, iconBounds, textLabel.ForeColor,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
             }
+
+            if (!_isSelected)
+            {
+                return;
+            }
+
+            using var brush = new SolidBrush(Utils.Theme.AccentBar);
+            e.Graphics.FillRectangle(brush, 0, 0, 4, textLabel.Height);
+        }
+
+        private const int IconWidth = 22;
+
+        // Windows 11 ships Segoe Fluent Icons, Windows 10 Segoe MDL2 Assets; without either the icons are left out
+        private static readonly Lazy<Font> s_iconFont = new(() =>
+        {
+            var installed = FontFamily.Families.Select(x => x.Name).ToHashSet();
+            var name = new[] { "Segoe Fluent Icons", "Segoe MDL2 Assets" }.FirstOrDefault(installed.Contains);
+            return name == null ? null : new Font(name, 13F, FontStyle.Regular, GraphicsUnit.Point);
+        });
+
+        private string _iconGlyph;
+
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public string IconGlyph
+        {
+            get { return _iconGlyph; }
+            set
+            {
+                _iconGlyph = value;
+                // Keeps the centered text clear of the icon
+                textLabel.Padding = value != null && s_iconFont.Value != null ? new Padding(IconWidth + 8, 0, 0, 0) : Padding.Empty;
+                textLabel.Invalidate();
+            }
+        }
+
+        private void TextMouseEnter(object sender, EventArgs e)
+        {
+            _isHovered = true;
+            base.OnMouseEnter(e);
+            UpdateVisualState();
+        }
+
+        private void TextMouseLeave(object sender, EventArgs e)
+        {
+            _isHovered = false;
+            base.OnMouseLeave(e);
+            UpdateVisualState();
+        }
+
+        private void TextMouseDown(object sender, EventArgs e)
+        {
+            if (clickEffectEnabled)
+            {
+                this.BorderStyle = BorderStyle.Fixed3D;
+            }
+        }
+
+        private void TextMouseUp(object sender, EventArgs e)
+        {
+            this.BorderStyle = BorderStyle.FixedSingle;
+            base.OnClick(e);
         }
     }
 
-    public string[] StringCollection
+    public class ModernValuePicker : Panel
     {
-        get
+        //Painting
+        private Font[] fonts = new Font[] { new Font("Segoe UI", (float)8.25), new Font("Segoe UI", 13), new Font("Segoe UI", 13, FontStyle.Bold) };
+        private Pen pixelPen = new Pen(Color.Black, 1);
+        private bool[] gStates = new bool[] { false, false, false, false, false };
+        private bool[] enabledStates = new bool[] { true, true };
+        private Rectangle leftRect = new Rectangle(1,1,1,1);
+        private Rectangle rightRect = new Rectangle(1,1,1,1);
+
+        //Other
+        private PickerValueType _type = PickerValueType.Integer;
+        private int _index = 0;
+        private int _maxInt = 99;
+        private int _minInt = 0;
+        private string[] _stringCollection = new string[] { };
+        private string _stringValue = "00";
+
+        public delegate void IndexChangedHandler(ModernValuePicker sender);
+        public event IndexChangedHandler IndexChanged;
+
+        public string PickerName { get; set; } = "Name";
+        public string StringValue
         {
-            return _stringCollection;
-        }
-        set
-        {
-            _stringCollection = value;
-            if (PickerType == PickerValueType.String)
+            get
             {
+                return _stringValue;
+            }
+            set
+            {
+                _stringValue = value;
+                this.Invalidate(new Rectangle(leftRect.Right, leftRect.Top, rightRect.Left - leftRect.Right, 50));
+            }
+        }
+        public bool SuppressIndexChange { get; set; } = false;
+
+        public PickerValueType PickerType
+        {
+            get {
+                return _type;
+            }
+            set
+            {
+                _type = value;
                 SuppressIndexChange = true;
                 Index = 0;
             }
         }
-    }
 
-    public int MaxIntegerValue {
-        get
+        public int Index
         {
-            return _maxInt;
-        }
-        set
-        {
-            _maxInt = value;
-            if (PickerType == PickerValueType.Integer && Index > _maxInt)
+            get
             {
-                Index = _maxInt;
+                return _index;
+            }
+            set
+            {
+                if (PickerType == PickerValueType.Integer)
+                {
+                    if (value > MaxIntegerValue)
+                    {
+                        _index = MaxIntegerValue;
+                    }
+                    else if (value < MinIntegerValue)
+                    {
+                        _index = MinIntegerValue;
+                    }
+                    else
+                    {
+                        _index = value;
+                    }
+                    StringValue = _index.ToString("00");
+                }
+                else
+                {
+                    if (value > StringCollection.Length - 1)
+                    {
+                        _index = 0;
+                    }
+                    else if (value < 0)
+                    {
+                        _index = StringCollection.Length - 1;
+                    }
+                    else
+                    {
+                        _index = value;
+                    }
+
+                    if (StringCollection.Length < 1)
+                    {
+                        StringValue = string.Empty;
+                    } else {
+                        StringValue = StringCollection[_index];
+                    }
+                }
+
+                if (SuppressIndexChange == true)
+                {
+                    SuppressIndexChange = false;
+                } else {
+                    if (IndexChanged != null) { IndexChanged(this); }
+                }
             }
         }
-    }
 
-    public int MinIntegerValue {
-        get
+        public string[] StringCollection
         {
-            return _minInt;
-        }
-        set
-        {
-            _minInt = value;
-            if (PickerType == PickerValueType.Integer && Index < _minInt)
+            get
             {
-                Index = _minInt;
+                return _stringCollection;
+            }
+            set
+            {
+                _stringCollection = value;
+                if (PickerType == PickerValueType.String)
+                {
+                    SuppressIndexChange = true;
+                    Index = 0;
+                }
             }
         }
-    }
 
-    public ModernValuePicker()
-    {
-        PickerName = "Name";
-        StringValue = "00";
-        Size = new Size(200, 100);
-        DoubleBuffered = true;
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        leftRect = new Rectangle(10, (this.Height / 5) * 3 - 25, 20, 50);
-        rightRect = new Rectangle(this.Width - 30, (this.Height / 5) * 3 - 25, 20, 50);
-        var leftSize = TextRenderer.MeasureText("<", fonts[0]);
-        var rightSize = TextRenderer.MeasureText(">", fonts[0]);
-        var valueSize = TextRenderer.MeasureText(StringValue.ToUpper(), fonts[1]);
-        var nameSize = TextRenderer.MeasureText(PickerName.ToUpper(), fonts[2]);
-
-        if (gStates[0]) g.FillRectangle(Brushes.LightGray, leftRect);
-        if (gStates[1]) g.FillRectangle(Brushes.LightGray, rightRect);
-        if (gStates[2]) g.FillRectangle(Brushes.DarkGray, leftRect);
-        if (gStates[3]) g.FillRectangle(Brushes.DarkGray, rightRect);
-
-        g.DrawRectangle(pixelPen, leftRect);
-        g.DrawRectangle(pixelPen, rightRect);
-        TextRenderer.DrawText(g, "<", fonts[0], new Point(leftRect.X + ((leftRect.Width / 2) - (leftSize.Width / 2)), leftRect.Y + ((leftRect.Height / 2) - (leftSize.Height / 2))), pixelPen.Color);
-        TextRenderer.DrawText(g, ">", fonts[0], new Point(rightRect.X + ((rightRect.Width / 2) - (rightSize.Width / 2)), rightRect.Y + ((rightRect.Height / 2) - (rightSize.Height / 2))), pixelPen.Color);
-        if (!gStates[4]) TextRenderer.DrawText(g, StringValue.ToUpper(), fonts[1], new Point((this.Width / 2) - (valueSize.Width / 2), (this.Height / 5) * 3 - (valueSize.Height / 2)), pixelPen.Color);
-        TextRenderer.DrawText(g, PickerName.ToUpper(), fonts[2], new Point((this.Width / 2) - (nameSize.Width / 2), (this.Height / 5) - (nameSize.Height / 2)), pixelPen.Color);
-    }
-
-    protected override void OnMouseMove(MouseEventArgs e)
-    {
-        if (leftRect.Contains(e.Location) && !gStates[0] && enabledStates[0])
-        {
-            gStates[0] = true;
-            this.Invalidate(leftRect);
-        }
-        else if (!leftRect.Contains(e.Location) && gStates[0])
-        {
-            gStates[0] = false;
-            this.Invalidate(leftRect);
+        public int MaxIntegerValue {
+            get
+            {
+                return _maxInt;
+            }
+            set
+            {
+                _maxInt = value;
+                if (PickerType == PickerValueType.Integer && Index > _maxInt)
+                {
+                    Index = _maxInt;
+                }
+            }
         }
 
-        if (rightRect.Contains(e.Location) && !gStates[1] && enabledStates[1])
+        public int MinIntegerValue {
+            get
+            {
+                return _minInt;
+            }
+            set
+            {
+                _minInt = value;
+                if (PickerType == PickerValueType.Integer && Index < _minInt)
+                {
+                    Index = _minInt;
+                }
+            }
+        }
+
+        public ModernValuePicker()
         {
-            gStates[1] = true;
+            PickerName = "Name";
+            StringValue = "00";
+            Size = new Size(200, 100);
+            DoubleBuffered = true;
+            UpdatePen();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            leftRect = new Rectangle(10, (this.Height / 5) * 3 - 25, 20, 50);
+            rightRect = new Rectangle(this.Width - 30, (this.Height / 5) * 3 - 25, 20, 50);
+            var leftSize = TextRenderer.MeasureText("<", fonts[0]);
+            var rightSize = TextRenderer.MeasureText(">", fonts[0]);
+            var valueSize = TextRenderer.MeasureText(StringValue.ToUpper(), fonts[1]);
+            var nameSize = TextRenderer.MeasureText(PickerName.ToUpper(), fonts[2]);
+
+            var hover = Utils.Theme.IsDark ? Utils.Theme.DarkHover : Color.LightGray;
+            using (var hoverBrush = new SolidBrush(hover))
+            {
+                if (gStates[0]) g.FillRectangle(hoverBrush, leftRect);
+                if (gStates[1]) g.FillRectangle(hoverBrush, rightRect);
+            }
+            if (gStates[2]) g.FillRectangle(Brushes.DarkGray, leftRect);
+            if (gStates[3]) g.FillRectangle(Brushes.DarkGray, rightRect);
+
+            g.DrawRectangle(pixelPen, leftRect);
+            g.DrawRectangle(pixelPen, rightRect);
+            TextRenderer.DrawText(g, "<", fonts[0], new Point(leftRect.X + ((leftRect.Width / 2) - (leftSize.Width / 2)), leftRect.Y + ((leftRect.Height / 2) - (leftSize.Height / 2))), pixelPen.Color);
+            TextRenderer.DrawText(g, ">", fonts[0], new Point(rightRect.X + ((rightRect.Width / 2) - (rightSize.Width / 2)), rightRect.Y + ((rightRect.Height / 2) - (rightSize.Height / 2))), pixelPen.Color);
+            if (!gStates[4]) TextRenderer.DrawText(g, StringValue.ToUpper(), fonts[1], new Point((this.Width / 2) - (valueSize.Width / 2), (this.Height / 5) * 3 - (valueSize.Height / 2)), pixelPen.Color);
+            TextRenderer.DrawText(g, PickerName.ToUpper(), fonts[2], new Point((this.Width / 2) - (nameSize.Width / 2), (this.Height / 5) - (nameSize.Height / 2)), pixelPen.Color);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            if (leftRect.Contains(e.Location) && !gStates[0] && enabledStates[0])
+            {
+                gStates[0] = true;
+                this.Invalidate(leftRect);
+            }
+            else if (!leftRect.Contains(e.Location) && gStates[0])
+            {
+                gStates[0] = false;
+                this.Invalidate(leftRect);
+            }
+
+            if (rightRect.Contains(e.Location) && !gStates[1] && enabledStates[1])
+            {
+                gStates[1] = true;
+                this.Invalidate(rightRect);
+            }
+            else if (!rightRect.Contains(e.Location) && gStates[1])
+            {
+                gStates[1] = false;
+                this.Invalidate(rightRect);
+            }
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            gStates = new bool[] { false, false, false, false, false };
+            
+            this.Invalidate(leftRect);
             this.Invalidate(rightRect);
         }
-        else if (!rightRect.Contains(e.Location) && gStates[1])
-        {
-            gStates[1] = false;
-            this.Invalidate(rightRect);
-        }
-    }
 
-    protected override void OnMouseLeave(EventArgs e)
-    {
-        gStates = new bool[] { false, false, false, false, false };
-        
-        this.Invalidate(leftRect);
-        this.Invalidate(rightRect);
-    }
-
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        if (leftRect.Contains(e.Location) && !gStates[2] && enabledStates[0])
+        protected override void OnMouseDown(MouseEventArgs e)
         {
-            gStates[2] = true;
-            this.Invalidate(leftRect);
-        }
-
-        if (rightRect.Contains(e.Location) && !gStates[3] && enabledStates[1])
-        {
-            gStates[3] = true;
-            this.Invalidate(rightRect);
-        }
-    }
-
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        if (gStates[2])
-        {
-            if (enabledStates[0])
+            if (leftRect.Contains(e.Location) && !gStates[2] && enabledStates[0])
             {
-                Index -= 1;
+                gStates[2] = true;
+                this.Invalidate(leftRect);
             }
-            gStates[2] = false;
-            this.Invalidate(leftRect);
-        }
 
-        if (gStates[3])
-        {
-            if (enabledStates[1])
+            if (rightRect.Contains(e.Location) && !gStates[3] && enabledStates[1])
             {
-                Index += 1;
-            }
-            gStates[3] = false;
-            this.Invalidate(rightRect);
-        }
-    }
-
-    protected override void OnEnabledChanged(EventArgs e)
-    {
-        base.OnEnabledChanged(e);
-        if (this.Enabled)
-        {
-            pixelPen = new Pen(Color.Black, 1);
-        } else {
-            pixelPen = new Pen(Color.Gray, 1);
-        }
-        this.Invalidate();
-    }
-
-    protected override void OnDoubleClick(EventArgs e)
-    {
-        if (gStates[4])
-        {
-            return;
-        }
-
-        var valueSize = TextRenderer.MeasureText(StringValue.ToUpper(), fonts[1]);
-        var valueLoc = new Point((this.Width / 2) - (valueSize.Width / 2), (this.Height / 5) * 3 - (valueSize.Height / 2));
-
-        if (!new Rectangle(valueLoc, valueSize).Contains(PointToClient(Cursor.Position)))
-        {
-            return;
-        }
-
-        Control entryBox;
-        if (PickerType == PickerValueType.Integer)
-        {
-            entryBox = new TextBox();
-        }
-        else
-        {
-            var newCombo = new ComboBox();
-            newCombo.Items.AddRange(StringCollection);
-            newCombo.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
-            newCombo.AutoCompleteSource = AutoCompleteSource.ListItems;
-            newCombo.SelectedIndexChanged += entryBox_IndexChanged;
-            entryBox = newCombo;
-        }
-        this.Controls.Add(entryBox);
-
-        entryBox.Font = fonts[1];
-        entryBox.Location = valueLoc;
-        entryBox.Text = StringValue;
-        entryBox.Size = valueSize;
-        entryBox.KeyDown += entryBox_KeyDown;
-        entryBox.Select();
-
-        enabledStates = new bool[] { false, false };
-        gStates[4] = true;
-        this.Invalidate();
-    }
-
-    private void entryBox_IndexChanged(object sender, EventArgs e)
-    {
-        var castedSender = (ComboBox)sender;
-        if (castedSender.Text != StringValue)
-        {
-            entryBox_ApplyValue(sender);
-        }
-    }
-
-    private void entryBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.KeyCode == Keys.Enter)
-        {
-            e.Handled = true; e.SuppressKeyPress = true;
-            entryBox_ApplyValue(sender);
-        }
-    }
-
-    private void entryBox_ApplyValue(object sender)
-    {
-        Control castedSender;
-        if (sender is ComboBox)
-        {
-            castedSender = (ComboBox)sender;
-            var newInd = Array.FindIndex(StringCollection, x => x.ToLower() == castedSender.Text.ToLower());
-            if (newInd > -1)
-            {
-                Index = newInd;
+                gStates[3] = true;
+                this.Invalidate(rightRect);
             }
         }
-        else
+
+        protected override void OnMouseUp(MouseEventArgs e)
         {
-            castedSender = (TextBox)sender;
-            int newInd;
-            if (int.TryParse(castedSender.Text, out newInd) == true)
+            if (gStates[2])
             {
-                Index = newInd;
+                if (enabledStates[0])
+                {
+                    Index -= 1;
+                }
+                gStates[2] = false;
+                this.Invalidate(leftRect);
+            }
+
+            if (gStates[3])
+            {
+                if (enabledStates[1])
+                {
+                    Index += 1;
+                }
+                gStates[3] = false;
+                this.Invalidate(rightRect);
             }
         }
-        this.Controls.Remove(castedSender);
 
-        enabledStates = new bool[] { true, true };
-        gStates[4] = false;
-        this.Invalidate();
+        protected override void OnEnabledChanged(EventArgs e)
+        {
+            base.OnEnabledChanged(e);
+            UpdatePen();
+        }
+
+        // Follows ForeColor instead of a fixed black, so the dark theme's light text applies
+        protected override void OnForeColorChanged(EventArgs e)
+        {
+            base.OnForeColorChanged(e);
+            UpdatePen();
+        }
+
+        private void UpdatePen()
+        {
+            pixelPen = new Pen(this.Enabled ? this.ForeColor : Color.Gray, 1);
+            this.Invalidate();
+        }
+
+        protected override void OnDoubleClick(EventArgs e)
+        {
+            if (gStates[4])
+            {
+                return;
+            }
+
+            var valueSize = TextRenderer.MeasureText(StringValue.ToUpper(), fonts[1]);
+            var valueLoc = new Point((this.Width / 2) - (valueSize.Width / 2), (this.Height / 5) * 3 - (valueSize.Height / 2));
+
+            if (!new Rectangle(valueLoc, valueSize).Contains(PointToClient(Cursor.Position)))
+            {
+                return;
+            }
+
+            Control entryBox;
+            if (PickerType == PickerValueType.Integer)
+            {
+                entryBox = new TextBox();
+            }
+            else
+            {
+                var newCombo = new ComboBox();
+                newCombo.Items.AddRange(StringCollection);
+                newCombo.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+                newCombo.AutoCompleteSource = AutoCompleteSource.ListItems;
+                newCombo.SelectedIndexChanged += entryBox_IndexChanged;
+                entryBox = newCombo;
+            }
+            this.Controls.Add(entryBox);
+
+            entryBox.Font = fonts[1];
+            entryBox.Location = valueLoc;
+            entryBox.Text = StringValue;
+            entryBox.Size = valueSize;
+            entryBox.KeyDown += entryBox_KeyDown;
+            entryBox.Select();
+
+            enabledStates = new bool[] { false, false };
+            gStates[4] = true;
+            this.Invalidate();
+        }
+
+        private void entryBox_IndexChanged(object sender, EventArgs e)
+        {
+            var castedSender = (ComboBox)sender;
+            if (castedSender.Text != StringValue)
+            {
+                entryBox_ApplyValue(sender);
+            }
+        }
+
+        private void entryBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true; e.SuppressKeyPress = true;
+                entryBox_ApplyValue(sender);
+            }
+        }
+
+        private void entryBox_ApplyValue(object sender)
+        {
+            Control castedSender;
+            if (sender is ComboBox)
+            {
+                castedSender = (ComboBox)sender;
+                var newInd = Array.FindIndex(StringCollection, x => x.ToLower() == castedSender.Text.ToLower());
+                if (newInd > -1)
+                {
+                    Index = newInd;
+                }
+            }
+            else
+            {
+                castedSender = (TextBox)sender;
+                int newInd;
+                if (int.TryParse(castedSender.Text, out newInd) == true)
+                {
+                    Index = newInd;
+                }
+            }
+            this.Controls.Remove(castedSender);
+
+            enabledStates = new bool[] { true, true };
+            gStates[4] = false;
+            this.Invalidate();
+        }
     }
-}
 
-public enum PickerValueType
-{
-    Integer,
-    String
+    public enum PickerValueType
+    {
+        Integer,
+        String
+    }
 }

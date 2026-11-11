@@ -37,12 +37,6 @@ public class AppearanceHelper2
                 return;
             }
 
-            if (!Global.PSDataEnabled)
-            {
-                MessageBox.Show("PSData is disabled. Body Gender cannot be changed.", "Notice");
-                return;
-            }
-
             // Everything is checked before the save is changed, so a failed change leaves it as it was
             var playerPuppet = (PlayerPuppetPS?)_saveFileHelper.GetPSDataContainer()?.Entries.FirstOrDefault(x => x.Data is PlayerPuppetPS)?.Data;
             if (playerPuppet == null)
@@ -87,27 +81,27 @@ public class AppearanceHelper2
     }
 
     [Browsable(false)]
-    public string? HairStyle
+    public string HairStyle
     {
-        get => (string?)GetValue();
+        get => GetValue();
         set => SetValue(value);
     }
 
     [Browsable(false)]
-    public string? HairColor
+    public string HairColor
     {
-        get => (string?)GetValue();
+        get => GetValue();
         set => SetValue(value);
     }
 
     [Browsable(false)]
-    public string? EyeColor
+    public string EyeColor
     {
-        get => (string?)GetValue();
+        get => GetValue();
         set => SetValue(value);
     }
 
-    private object? GetValue([CallerMemberName] string? callerMemberName = null)
+    private string GetValue([CallerMemberName] string? callerMemberName = null)
     {
         if (callerMemberName == nameof(HairStyle))
         {

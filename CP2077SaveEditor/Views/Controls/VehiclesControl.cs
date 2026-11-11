@@ -8,115 +8,165 @@ using CP2077SaveEditor.Extensions;
 using CP2077SaveEditor.Utils;
 using WolvenKit.RED4.Types;
 
-namespace CP2077SaveEditor.Views.Controls;
-
-public partial class VehiclesControl : UserControl, IGameControl
+namespace CP2077SaveEditor.Views.Controls
 {
-    private readonly Form2 _parentForm;
-
-    public VehiclesControl(Form2 parentForm)
+    public partial class VehiclesControl : UserControl, IGameControl
     {
-        InitializeComponent();
+        private readonly MainForm _parentForm;
 
-        _parentForm = parentForm;
-        _parentForm.PropertyChanged += OnParentFormPropertyChanged;
-    }
+        private readonly List<string> _vehicles = JsonSerializer.Deserialize<List<string>>(CP2077SaveEditor.Properties.Resources.Vehicles);
 
-    public string GameControlName => "Unlocked Vehicles";
+        private vehicleGarageComponentPS _garagePS;
 
-    private void OnParentFormPropertyChanged(object sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(_parentForm.ActiveSaveFile))
+        public VehiclesControl(MainForm parentForm)
         {
-            if (_parentForm.ActiveSaveFile != null)
+            InitializeComponent();
+
+            _parentForm = parentForm;
+            _parentForm.PropertyChanged += OnParentFormPropertyChanged;
+        }
+
+        public string GameControlName => "Unlocked Vehicles";
+        public string Icon => "";
+
+        private void OnParentFormPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(_parentForm.ActiveSaveFile))
             {
-                this.InvokeIfRequired(Init);
+                if (_parentForm.ActiveSaveFile != null)
+                {
+                    this.InvokeIfRequired(Init);
+                }
             }
         }
-    }
 
-    private void vehiclesListView_DoubleClick(object sender, EventArgs e)
-    {
-        var ps = _parentForm.ActiveSaveFile.GetPSDataContainer();
-        var vehiclePS = (vehicleGarageComponentPS)ps.Entries.Where(x => x.Data is vehicleGarageComponentPS).FirstOrDefault().Data;
-        var unlockedVehicles = vehiclePS.UnlockedVehicleArray.Select(x => x.VehicleID.RecordID.ResolvedText);
-
-        foreach (var selectedItem in vehiclesListView.SelectedVirtualItems())
+        private void Init()
         {
-            selectedItem.Checked = !selectedItem.Checked;
+            var ps = _parentForm.ActiveSaveFile.GetPSDataContainer();
+            _garagePS = (vehicleGarageComponentPS)ps.Entries.FirstOrDefault(x => x.Data is vehicleGarageComponentPS)?.Data;
 
-            if (selectedItem.Checked)
+            if (_garagePS != null)
             {
-                if (!unlockedVehicles.Contains(selectedItem.Text))
+                _garagePS.UnlockedVehicleArray ??= new();
+            }
+
+            vehiclesListView.Enabled = _garagePS != null;
+            pnl_Top.Enabled = _garagePS != null;
+
+            RefreshList();
+        }
+
+        private void RefreshList()
+        {
+            var listItems = new List<ListViewItem>();
+
+            if (_garagePS == null)
+            {
+                listItems.Add(new ListViewItem("No vehicle data found. Try unlocking at least 1 vehicle in-game first."));
+            }
+            else
+            {
+                var unlockedVehicles = _garagePS.UnlockedVehicleArray.Select(x => x.VehicleID.RecordID.ResolvedText).ToHashSet();
+
+                foreach (var vehicle in GetVisibleVehicles())
                 {
-                    vehiclePS.UnlockedVehicleArray.Add(new vehicleUnlockedVehicle()
+                    listItems.Add(new ListViewItem(new[] { vehicle, ResourceHelper.GetDisplayName(vehicle) ?? "" })
                     {
-                        VehicleID = new vehicleGarageVehicleID() { RecordID = selectedItem.Text }
+                        Checked = unlockedVehicles.Contains(vehicle)
                     });
                 }
             }
-            else
+
+            vehiclesListView.SetVirtualItems(listItems);
+        }
+
+        private IEnumerable<string> GetVisibleVehicles()
+        {
+            var search = txt_Search.Text.Trim();
+            if (search == "")
             {
-                if (unlockedVehicles.Contains(selectedItem.Text))
+                return _vehicles;
+            }
+
+            return _vehicles.Where(x => x.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                                        (ResourceHelper.GetDisplayName(x)?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false));
+        }
+
+        private void SetUnlocked(string vehicle, bool unlocked)
+        {
+            var list = _garagePS.UnlockedVehicleArray;
+            ChangeTracker.MarkChanged();
+            var existing = list.FirstOrDefault(x => x.VehicleID.RecordID.ResolvedText == vehicle);
+
+            if (unlocked && existing == null)
+            {
+                list.Add(new vehicleUnlockedVehicle
                 {
-                    var list = vehiclePS.UnlockedVehicleArray;
-                    for(int i = 0; i < list.Count; i++)
-                    {
-                        var unlocked = list[i];
-
-                        if (unlocked.VehicleID.RecordID.ResolvedText == selectedItem.Text)
-                        {
-                            list.Remove(unlocked);
-                            break;
-                        }
-                    }
-                    foreach (var unlocked in vehiclePS.UnlockedVehicleArray)
-                    {
-                        
-                    }
-                }
+                    VehicleID = new vehicleGarageVehicleID { RecordID = vehicle }
+                });
+            }
+            else if (!unlocked && existing != null)
+            {
+                list.Remove(existing);
             }
         }
 
-        vehiclesListView.Invalidate();
-    }
-
-    private void Init()
-    {
-        var listItems = new List<ListViewItem>();
-
-        var ps = _parentForm.ActiveSaveFile.GetPSDataContainer();
-        var vehiclePS = (vehicleGarageComponentPS)ps.Entries.FirstOrDefault(x => x.Data is vehicleGarageComponentPS)?.Data;
-        var unlockedVehicles = new List<string>();
-
-        var vehicles = JsonSerializer.Deserialize<List<string>>(CP2077SaveEditor.Properties.Resources.Vehicles);
-
-        if (vehiclePS != null)
+        private void vehiclesListView_DoubleClick(object sender, EventArgs e)
         {
-            vehiclesListView.Enabled = true;
-            if (vehiclePS.UnlockedVehicleArray == null)
+            if (_garagePS == null)
             {
-                vehiclePS.UnlockedVehicleArray = new();
-            }
-            else
-            {
-                unlockedVehicles = vehiclePS.UnlockedVehicleArray.Select(x => x.VehicleID.RecordID.ResolvedText).ToList();
+                return;
             }
 
-            foreach (var info in vehicles)
+            foreach (var selectedItem in vehiclesListView.SelectedVirtualItems())
             {
-                var newItem = new ListViewItem(info);
-                newItem.Checked = true;
-                newItem.Checked = unlockedVehicles.Contains(info);
-                listItems.Add(newItem);
+                selectedItem.Checked = !selectedItem.Checked;
+                SetUnlocked(selectedItem.Text, selectedItem.Checked);
             }
+
+            vehiclesListView.Invalidate();
         }
-        else
+
+        private void txt_Search_TextChanged(object sender, EventArgs e)
         {
-            vehiclesListView.Enabled = false;
-            listItems.Add(new ListViewItem("No vehicle data found. Try unlocking at least 1 vehicle in-game first."));
+            if (_garagePS != null)
+            {
+                RefreshList();
+            }
         }
 
-        vehiclesListView.SetVirtualItems(listItems);
+        private void btn_UnlockAll_Click(object sender, EventArgs e)
+        {
+            SetAllVisible(true);
+        }
+
+        private void btn_LockAll_Click(object sender, EventArgs e)
+        {
+            SetAllVisible(false);
+        }
+
+        // Acts on the vehicles matching the current search, so a filtered subset can be (un)locked at once
+        private void SetAllVisible(bool unlocked)
+        {
+            var vehicles = GetVisibleVehicles().ToList();
+            if (vehicles.Count == 0)
+            {
+                return;
+            }
+
+            var action = unlocked ? "Unlock" : "Lock";
+            var scope = txt_Search.Text.Trim() == "" ? "all" : "the";
+            if (MessageBox.Show($"{action} {scope} {vehicles.Count} listed vehicle(s)?", $"{action} vehicles", MessageBoxButtons.YesNo) != DialogResult.Yes)
+            {
+                return;
+            }
+
+            foreach (var vehicle in vehicles)
+            {
+                SetUnlocked(vehicle, unlocked);
+            }
+
+            RefreshList();
+        }
     }
 }
