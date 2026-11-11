@@ -1,4 +1,4 @@
-# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29d)
+# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29e)
 
 A save editor for Cyberpunk 2077, updated to work with **patch 2.5** saves.
 
@@ -6,9 +6,9 @@ This is an **unofficial fork** of [CyberCAT-SimpleGUI by Deweh (DeweySalt)](http
 
 ## ⬇️ Download (no coding needed)
 
-1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29d-win-x64.zip** under **Assets**.
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29e-win-x64.zip** under **Assets**.
 2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
-3. Open the extracted `CP2077SaveEditor-v0.29d` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+3. Open the extracted `CP2077SaveEditor-v0.29e` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
 4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
 
 Requires 64-bit Windows 10 or 11.
@@ -21,6 +21,14 @@ Requires 64-bit Windows 10 or 11.
 - Save into a **new save slot** rather than over your only copy. When you overwrite a `sav.dat`, the editor keeps the previous file as `sav.old`.
 - Editing quest facts and inventory flags can break quests or items in ways that only show up hours later. Keep your backup for a while.
 - Please report problems with the `error.txt` the editor creates next to the exe, the game version, and what you changed.
+
+## What's new in v0.29e
+
+[RELEASE_NOTES.md](RELEASE_NOTES.md) has the full release post.
+
+- **Large saves** that failed with "Exception of type 'System.Exception' was thrown" now load and save.
+- **Saves that grow while editing** can be saved, the editor makes room like the game does.
+- **Clearer errors** for files that aren't PC saves or are damaged.
 
 ## What's new in v0.29d
 
@@ -124,7 +132,7 @@ To build a self-contained release into `releases/v<version>/`, with the docs and
 dotnet publish CP2077SaveEditor/CP2077SaveEditor.csproj -p:PublishProfile=win-x64
 ```
 
-The version is set in [CP2077SaveEditor.csproj](CP2077SaveEditor/CP2077SaveEditor.csproj). `DisplayVersion` (like `0.29d`) is what the window title, status bar, credits dialog and release folder show. `Version` must stay numeric (like `0.29.3`): WolvenKit reads it as strict SemVer when it loads or saves appearance presets, and a letter in it breaks them. Bump both for a release.
+The version is set in [CP2077SaveEditor.csproj](CP2077SaveEditor/CP2077SaveEditor.csproj). `DisplayVersion` (like `0.29e`) is what the window title, status bar, credits dialog and release folder show. `Version` must stay numeric (like `0.29.4`): WolvenKit reads it as strict SemVer when it loads or saves appearance presets, and a letter in it breaks them. Bump both for a release.
 
 ### Updating WolvenKit
 

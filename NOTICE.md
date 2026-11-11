@@ -18,6 +18,17 @@
 
 The editor's own source code is MIT licensed. The released `CP2077SaveEditor.exe` is built together with WolvenKit, which is GPL-3.0, so the program as distributed is covered by the GPL-3.0. Anyone who redistributes the binaries must also make the full corresponding source available, including the modified WolvenKit files listed below.
 
+## Changes in v0.29e (2026-11)
+
+### Editor (`CP2077SaveEditor`)
+
+- `CP2077SaveEditor/CP2077SaveEditor.csproj`: new version number.
+
+### WolvenKit (`patches/WolvenKit.patch`)
+
+- `WolvenKit.RED4/Save/Helper/Compression.cs`: saves whose chunk table has a size other than 0x100, 0x200 or 0x400 keep the table size and chunk size they were read with, instead of throwing. New `FitSettings` doubles the table when the data needs more chunks than it holds. Previously writing such a save allocated a negative-size array. Missing or misplaced `FZLC` headers throw `InvalidDataException` with a message instead of a bare `Exception`.
+- `WolvenKit.RED4/Save/IO/CyberpunkSaveWriter.cs`: sizes the chunk table with `FitSettings` before the node offsets are computed, since they depend on it.
+
 ## Changes in v0.29d (2026-11)
 
 ### Editor (`CP2077SaveEditor`)

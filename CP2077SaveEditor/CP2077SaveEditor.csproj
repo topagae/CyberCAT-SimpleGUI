@@ -12,8 +12,8 @@
       InformationalVersion must stay valid SemVer. WolvenKit parses it strictly when it reads or writes
       appearance presets, and a version like "0.29c" made that throw. Bump both when releasing.
     -->
-    <DisplayVersion>0.29d</DisplayVersion>
-    <Version>0.29.3</Version>
+    <DisplayVersion>0.29e</DisplayVersion>
+    <Version>0.29.4</Version>
     <InformationalVersion>$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>CyberCAT-SimpleGUI</Product>
