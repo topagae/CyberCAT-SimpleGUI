@@ -159,6 +159,8 @@ public partial class QuestFactsControl : UserControl, IGameControl
         _parentForm.ActiveSaveFile.SetFactByName("panam_romanceable", 1);
         _parentForm.ActiveSaveFile.SetFactByName("kerry_romanceable", 1);
         RefreshFacts();
-        MessageBox.Show("All characters are now romanceable.");
+        MessageBox.Show("Romance flags set for Judy, River, Panam and Kerry.\n\n" +
+                        "The game still checks V's body and voice in some romance scenes, so a romance outside the vanilla " +
+                        "rules (for example Panam with a female V) also needs a romance mod.");
     }
 }

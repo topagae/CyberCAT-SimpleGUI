@@ -1,4 +1,4 @@
-# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29c)
+# CyberCAT-SimpleGUI: Patch 2.5 update (v0.29d)
 
 A save editor for Cyberpunk 2077, updated to work with **patch 2.5** saves.
 
@@ -6,9 +6,9 @@ This is an **unofficial fork** of [CyberCAT-SimpleGUI by Deweh (DeweySalt)](http
 
 ## ⬇️ Download (no coding needed)
 
-1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29c-win-x64.zip** under **Assets**.
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29d-win-x64.zip** under **Assets**.
 2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
-3. Open the extracted `CP2077SaveEditor-v0.29c` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+3. Open the extracted `CP2077SaveEditor-v0.29d` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
 4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
 
 Requires 64-bit Windows 10 or 11.
@@ -22,9 +22,17 @@ Requires 64-bit Windows 10 or 11.
 - Editing quest facts and inventory flags can break quests or items in ways that only show up hours later. Keep your backup for a while.
 - Please report problems with the `error.txt` the editor creates next to the exe, the game version, and what you changed.
 
-## What's new in v0.29c
+## What's new in v0.29d
 
 [RELEASE_NOTES.md](RELEASE_NOTES.md) has the full release post.
+
+- **Appearance presets and body gender changes work again.** In v0.29a to v0.29c they failed with "Minor version contains invalid character".
+- **Saves using lifepath mods** (like Fresh Start) load, and their lifepath is kept.
+- **"Unlock all fast travel points"** only adds missing points, instead of replacing the list and losing ones the editor doesn't know about.
+- **Ctrl+S / Ctrl+O** save and open, also where the buttons don't show (Wine, Proton).
+- Clearer messages when `kraken.dll` can't be loaded, and on what the romance button can and can't do.
+
+## What's new in v0.29c
 
 - **Changing body gender works again.** It used to leave a mix of both body types with the old head, and the game could crash at the mirror. The new body now gets a complete appearance made for patch 2.5, and a change that can't be made leaves the save untouched.
 - **Saves with script mods:** the player and NPC data that some mods add fields to is now read and kept. Previously the editor skipped that data, so body gender couldn't be changed on those saves.
@@ -116,7 +124,7 @@ To build a self-contained release into `releases/v<version>/`, with the docs and
 dotnet publish CP2077SaveEditor/CP2077SaveEditor.csproj -p:PublishProfile=win-x64
 ```
 
-The version is set in one place, `InformationalVersion` in [CP2077SaveEditor.csproj](CP2077SaveEditor/CP2077SaveEditor.csproj). The window title, status bar and credits dialog all read it from there.
+The version is set in [CP2077SaveEditor.csproj](CP2077SaveEditor/CP2077SaveEditor.csproj). `DisplayVersion` (like `0.29d`) is what the window title, status bar, credits dialog and release folder show. `Version` must stay numeric (like `0.29.3`): WolvenKit reads it as strict SemVer when it loads or saves appearance presets, and a letter in it breaks them. Bump both for a release.
 
 ### Updating WolvenKit
 
