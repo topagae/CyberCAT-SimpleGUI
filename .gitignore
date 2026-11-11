@@ -340,3 +340,7 @@ ASALocalRun/
 healthchecksdb
 # Editor logs
 logs/
+
+# Local test saves and the Nexus Mods API key (this fork only)
+current-errors/
+.nexus-api-key
