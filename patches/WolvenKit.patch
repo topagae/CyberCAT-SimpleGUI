@@ -16,6 +16,118 @@ index b1f99738a..bcef27c33 100644
  
              if (compiledPropertyData != null && compiledPropertyData.IsCustomReadNeeded(header))
              {
+diff --git a/WolvenKit.RED4/Save/Helper/Compression.cs b/WolvenKit.RED4/Save/Helper/Compression.cs
+index 988e8fbcc..195d08aaf 100644
+--- a/WolvenKit.RED4/Save/Helper/Compression.cs
++++ b/WolvenKit.RED4/Save/Helper/Compression.cs
+@@ -1,3 +1,4 @@
++// Modified 2026-11 for CyberCAT-SimpleGUI v0.29e: saves with other chunk table sizes load, and saves that outgrow their table can be written. See NOTICE.md there.
+ using K4os.Compression.LZ4;
+ using System.Diagnostics;
+ using System.Text;
+@@ -21,6 +22,29 @@ public class Compression
+         writer.Write(new byte[(compressionSettings.TableEntriesCount - chunkInfos.Count) * 12]);
+     }
+ 
++    /// <summary>
++    /// Returns settings whose chunk table can hold <paramref name="dataLength"/> bytes. A save that grew past its
++    /// table gets a larger one, like the game does (0x100, 0x200, ...). Previously that failed with an overflow.
++    /// </summary>
++    public static Settings FitSettings(Settings compressionSettings, int dataLength)
++    {
++        // Write always adds a final chunk, even an empty one
++        var chunkCount = dataLength / compressionSettings.ChunkSize + 1;
++
++        var tableEntriesCount = compressionSettings.TableEntriesCount;
++        while (chunkCount > tableEntriesCount)
++        {
++            tableEntriesCount *= 2;
++        }
++
++        if (tableEntriesCount == compressionSettings.TableEntriesCount)
++        {
++            return compressionSettings;
++        }
++
++        return new Settings { TableEntriesCount = tableEntriesCount, ChunkSize = compressionSettings.ChunkSize };
++    }
++
+     public static void Write(BinaryWriter writer, byte[] data, Settings compressionSettings, bool compress)
+     {
+         if (compress)
+@@ -93,6 +117,12 @@ public class Compression
+             processedData = ms.ToArray();
+         }
+ 
++        // Callers size the table with FitSettings first, the node offsets depend on it
++        if (chunks.Count > compressionSettings.TableEntriesCount)
++        {
++            throw new InvalidOperationException($"The save needs {chunks.Count} chunks, but its chunk table only has room for {compressionSettings.TableEntriesCount}.");
++        }
++
+         var dataOffset = startPos + 8 + (compressionSettings.TableEntriesCount * 12);
+         foreach (var chunk in chunks)
+         {
+@@ -155,7 +185,7 @@ public class Compression
+         
+         var magicInt = BitConverter.ToUInt32(Encoding.ASCII.GetBytes("FZLC"), 0);
+         if (reader.ReadUInt32() != magicInt)
+-            throw new Exception();
++            throw new InvalidDataException("The save's compressed data is damaged (FZLC header not found where expected).");
+ 
+         var result = new CompressionHeader();
+ 
+@@ -250,7 +280,7 @@ public class Compression
+ 
+         var compressionTablePos = SeekMagicBytes(reader.BaseStream, "FZLC");
+         if (compressionTablePos == -1)
+-            throw new Exception();
++            throw new InvalidDataException("No compressed save data found. This isn't a Cyberpunk 2077 PC save, or the file is damaged or incomplete.");
+ 
+         reader.BaseStream.Position = 0;
+         result.Write(reader.ReadBytes((int)compressionTablePos));
+@@ -333,7 +363,21 @@ public class Compression
+                     return new Settings { TableEntriesCount = 0x400, ChunkSize = 0x00080000 };
+                 }
+ 
+-                throw new Exception();
++                // Other table sizes (for example very large modded saves): keep the layout the save already uses.
++                // All chunks but the last have the full chunk size.
++                if (MaxEntries >= DataChunkInfos.Count && DataChunkInfos.Count > 0)
++                {
++                    var chunkSize = DataChunkInfos.Count > 1
++                        ? DataChunkInfos.Take(DataChunkInfos.Count - 1).Max(x => x.DecompressedSize)
++                        : 0x00040000;
++
++                    if (chunkSize > 0)
++                    {
++                        return new Settings { TableEntriesCount = MaxEntries, ChunkSize = chunkSize };
++                    }
++                }
++
++                throw new InvalidDataException($"Unsupported save compression layout ({DataChunkInfos.Count} chunks, table size {MaxEntries}).");
+             }
+         }
+     }
+diff --git a/WolvenKit.RED4/Save/IO/CyberpunkSaveWriter.cs b/WolvenKit.RED4/Save/IO/CyberpunkSaveWriter.cs
+index 5887dfa9a..d53e1b173 100644
+--- a/WolvenKit.RED4/Save/IO/CyberpunkSaveWriter.cs
++++ b/WolvenKit.RED4/Save/IO/CyberpunkSaveWriter.cs
+@@ -1,3 +1,4 @@
++// Modified 2026-11 for CyberCAT-SimpleGUI v0.29e: the chunk table grows when a save outgrows it. See NOTICE.md there.
+ using System.Text;
+ using WolvenKit.Core.Extensions;
+ 
+@@ -37,6 +38,9 @@ public class CyberpunkSaveWriter : IDisposable
+         var uncompressedData = GetNodeData(out var nodeInfos);
+         NodeInfos = nodeInfos;
+ 
++        // Before the offsets are computed, they depend on the table size
++        _file.CompressionSettings = Compression.FitSettings(_file.CompressionSettings, uncompressedData.Length);
++
+         var dataOffset = (int)(_writer.BaseStream.Position + 8 + (_file.CompressionSettings.TableEntriesCount * 12));
+         foreach (var nodeInfo in nodeInfos)
+         {
 diff --git a/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs b/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs
 index 697a00765..b8e9e7bb0 100644
 --- a/WolvenKit.RED4/Save/Parser/PersistencySystem2Parser.cs

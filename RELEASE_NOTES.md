@@ -1,4 +1,4 @@
-# CyberCAT-SimpleGUI v0.29d: save editor updated for Cyberpunk 2077 patch 2.5
+# CyberCAT-SimpleGUI v0.29e: save editor updated for Cyberpunk 2077 patch 2.5
 
 The CyberCAT-SimpleGUI save editor works again. This is an unofficial fork of Deweh's [CyberCAT-SimpleGUI](https://github.com/Deweh/CyberCAT-SimpleGUI), which stopped working with patch 2.5 saves.
 
@@ -6,9 +6,9 @@ The full source is at https://github.com/topagae/CyberCAT-SimpleGUI.
 
 ## ⬇️ Download (no coding needed)
 
-1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29d-win-x64.zip** under **Assets**.
+1. Go to the **[latest release](https://github.com/topagae/CyberCAT-SimpleGUI/releases/latest)** and click **CP2077SaveEditor-v0.29e-win-x64.zip** under **Assets**.
 2. Right-click the downloaded zip and choose **Extract All...**. Don't run the editor from inside the zip.
-3. Open the extracted `CP2077SaveEditor-v0.29d` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
+3. Open the extracted `CP2077SaveEditor-v0.29e` folder and double-click **CP2077SaveEditor.exe**. There's nothing to install.
 4. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**. This appears because the program isn't signed with a paid certificate.
 
 Requires 64-bit Windows 10 or 11.
@@ -20,6 +20,12 @@ Requires 64-bit Windows 10 or 11.
 - **Everything else is tested by code only.** That covers inventory, vehicles, quest facts, extras, body gender changes, patch 2.0–2.31 saves and modded saves. Automated tests on real saves (2.0, 2.01, 2.31, 2.5) load, edit, save and reload them without losing data, but that doesn't guarantee the game accepts every edit.
 - Save into a new slot, not over your only copy.
 - Editing quest facts and item flags can break things hours later. Keep your backup for a while.
+
+## What's new in v0.29e
+
+- **Large saves load and save.** Saves the editor couldn't open failed with "Exception of type 'System.Exception' was thrown" (in `CompressionHeader.get_Settings`). This happened with saves that store their data in a layout the editor didn't know, usually very large modded saves. They now load, and are written back the same way.
+- **Saves that grow while editing can be saved.** If your edits made a save bigger than its original layout allowed, saving failed. The editor now makes room, like the game does.
+- **Clearer errors** when a file isn't a PC save or is damaged, instead of "Exception of type 'System.Exception' was thrown".
 
 ## What's new in v0.29d
 
